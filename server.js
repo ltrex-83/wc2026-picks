@@ -151,3 +151,54 @@ app.listen(PORT, () => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   if (!fs.existsSync(DATA_FILE)) writeData(defaultState());
 });
+
+// ── Live results refresh via Anthropic API ────────────────────
+app.post('/api/refresh', requireKey, async (req, res) => {
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'tools-2024-04-04'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1500,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{
+          role: 'user',
+          content: `Search for all completed 2026 FIFA World Cup match results. Return ONLY valid JSON with two keys: "group" and "knockout".
+
+"group" keys: "A-0" to "L-5". Match index per group: 0=[t1 vs t2], 1=[t3 vs t4], 2=[t1 vs t3], 3=[t2 vs t4], 4=[t1 vs t4], 5=[t2 vs t3].
+Teams: A=[Mexico,SouthAfrica,SouthKorea,Czechia] B=[Canada,Bosnia,Switzerland,Qatar] C=[Brazil,Morocco,Scotland,Haiti] D=[USA,Paraguay,Australia,Turkiye] E=[Germany,Curacao,IvoryCoast,Ecuador] F=[Netherlands,Japan,Sweden,Tunisia] G=[Belgium,Egypt,Iran,NewZealand] H=[Spain,CapeVerde,SaudiArabia,Uruguay] I=[France,Senegal,Norway,Iraq] J=[Argentina,Algeria,Austria,Jordan] K=[Portugal,DRCongo,Uzbekistan,Colombia] L=[England,Croatia,Ghana,Panama]
+Values: "t1"=first team wins, "t2"=second team wins, "draw"=draw. Only completed matches.
+
+"knockout" keys: "R32-0" to "R32-15", "R16-0" to "R16-7", "QF-0" to "QF-3", "SF-0" to "SF-1", "F-0".
+Value = exact winning team name string. Only completed knockout matches.
+
+Return pure JSON only. No markdown fences.`
+        }]
+      })
+    });
+
+    const data = await response.json();
+    let raw = '';
+    for (const c of (data.content || [])) {
+      if (c.type === 'text') raw += c.text;
+    }
+    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+
+    // Merge into stored actuals
+    const state = readData();
+    if (parsed.group) Object.assign(state.gActuals, parsed.group);
+    if (parsed.knockout) Object.assign(state.kActuals, parsed.knockout);
+    writeData(state);
+
+    res.json({ success: true, group: parsed.group || {}, knockout: parsed.knockout || {}, updatedAt: new Date().toISOString() });
+  } catch (e) {
+    console.error('Refresh error:', e.message);
+    res.status(500).json({ error: 'Refresh failed', detail: e.message });
+  }
+});
