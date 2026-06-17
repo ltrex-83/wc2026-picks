@@ -54,11 +54,9 @@
   .view { display: none; padding: 14px 12px; max-width: 1100px; margin: 0 auto; }
   .view.on { display: block; }
 
-  /* LEGEND */
   .legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 11px; color: var(--muted); margin-bottom: 12px; padding: 8px 10px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); }
   .lsw { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 
-  /* GROUP GRID */
   .ggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
   .gc { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 11px; }
   .gtag { display: inline-block; background: var(--green); color: #fff; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-bottom: 9px; letter-spacing: .03em; }
@@ -70,11 +68,12 @@
   .dbtn { padding: 4px 5px; border: 1px solid var(--border); border-radius: 5px; cursor: pointer; background: var(--bg); color: var(--subtle); font-size: 9px; font-family: var(--font); min-width: 30px; text-align: center; transition: all .12s; }
   .dbtn:hover:not([disabled]) { border-color: var(--lime); color: var(--lime); }
 
-  /* pick state classes */
   .vp1 { background: var(--blue-light) !important; border-color: var(--blue) !important; color: var(--blue-dark) !important; font-weight: 600; }
   .vp2 { background: var(--orange-light) !important; border-color: var(--orange) !important; color: var(--orange-dark) !important; font-weight: 600; }
   .vdp1 { background: var(--lime-light) !important; border-color: var(--lime) !important; color: var(--lime-dark) !important; font-weight: 600; }
   .vdp2 { background: var(--amber-light) !important; border-color: var(--amber) !important; color: var(--amber-dark) !important; font-weight: 600; }
+  .vboth { background: linear-gradient(90deg, var(--blue-light) 50%, var(--orange-light) 50%) !important; border-color: var(--green) !important; color: var(--text) !important; font-weight: 600; }
+  .vdboth { background: linear-gradient(90deg, var(--lime-light) 50%, var(--amber-light) 50%) !important; border-color: var(--green) !important; font-weight: 600; }
 
   .arow { display: flex; align-items: center; gap: 4px; padding-left: 1px; margin-bottom: 4px; flex-wrap: wrap; }
   .albl { font-size: 9px; color: var(--subtle); min-width: 36px; }
@@ -93,7 +92,6 @@
   .mini-t tr.q td:first-child { border-radius: 3px 0 0 3px; }
   .mini-t tr.q td:last-child { border-radius: 0 3px 3px 0; }
 
-  /* KNOCKOUT */
   .kinfo { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 12px; font-size: 12px; color: var(--muted); margin-bottom: 12px; line-height: 1.6; }
   .kinfo strong { color: var(--text); }
   .round-sec { margin-bottom: 18px; }
@@ -115,14 +113,12 @@
   .kresult.kok { color: var(--lime-dark); background: var(--lime-light); }
   .kresult.kwrong { color: var(--red-dark); background: var(--red-light); }
 
-  /* REFRESH */
   .rbtn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; background: var(--card); color: var(--muted); font-size: 12px; font-family: var(--font); margin-bottom: 14px; transition: all .15s; }
   .rbtn:hover { border-color: var(--green); color: var(--green); }
   .spin { display: inline-block; animation: sp 1s linear infinite; }
   @keyframes sp { to { transform: rotate(360deg); } }
   .smsg { font-size: 10px; color: var(--subtle); }
 
-  /* SCOREBOARD */
   .sc-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
   .sc-card { border-radius: var(--radius); padding: 14px; text-align: center; }
   .sc-card.s1 { background: var(--blue-light); }
@@ -149,7 +145,6 @@
     .sc-card .pts { font-size: 28px; }
   }
 
-
   /* ADMIN EDIT MODE */
   .admin-bar {
     display: none; background: #712B13; color: #fff;
@@ -165,10 +160,13 @@
   .edit-mode .tbtn[disabled]:hover, .edit-mode .dbtn[disabled]:hover { border-color: #D85A30 !important; color: #D85A30 !important; }
   .edit-mode .kt.klocked { cursor: pointer !important; }
   .edit-mode .km { outline: 1.5px dashed #D85A30; outline-offset: 2px; border-radius: 8px; }
-  /* BOTH PICK — split highlight */
-  .vboth { background: linear-gradient(90deg, var(--blue-light) 50%, var(--orange-light) 50%) !important; border-color: var(--green) !important; color: var(--text) !important; font-weight: 600; }
-  .vdboth { background: linear-gradient(90deg, var(--lime-light) 50%, var(--amber-light) 50%) !important; border-color: var(--green) !important; font-weight: 600; }
 
+  /* TIME-LOCKED MATCH */
+  .tbtn[disabled].time-locked, .dbtn[disabled].time-locked {
+    border-color: var(--red-dark) !important;
+    color: var(--red-dark) !important;
+    opacity: .5;
+  }
   /* PASSWORD GATE */
   #gate {
     position: fixed; inset: 0; z-index: 9999;
@@ -200,10 +198,7 @@
     border: none; border-radius: 8px; cursor: pointer; transition: opacity .15s;
   }
   .gate-box button:hover { opacity: .88; }
-  .gate-err {
-    font-size: 12px; color: var(--red-dark); margin-top: 10px;
-    min-height: 16px;
-  }
+  .gate-err { font-size: 12px; color: var(--red-dark); margin-top: 10px; min-height: 16px; }
 </style>
 </head>
 <body>
@@ -213,13 +208,12 @@
   <div class="gate-box">
     <div class="trophy">🏆</div>
     <h2>WC 2026 Picks</h2>
-    <p>Luis &amp; Melissa&#39;s private predictor.<br>Enter the password to continue.</p>
-    <input type="password" id="pw-input" placeholder="Password" onkeydown="if(event.key===&#39;Enter&#39;)checkPw()" autofocus>
+    <p>Luis &amp; Melissa's private predictor.<br>Enter the password to continue.</p>
+    <input type="password" id="pw-input" placeholder="Password" onkeydown="if(event.key==='Enter')checkPw()" autofocus>
     <button onclick="checkPw()">Enter</button>
     <div class="gate-err" id="gate-err"></div>
   </div>
 </div>
-
 
 <div class="topbar">
   <h1>🏆 WC 2026 <span>Luis vs Melissa</span></h1>
@@ -241,17 +235,26 @@
   <button class="tab" onclick="showV('board',this)">Scoreboard</button>
 </div>
 
-<div id="sync-bar" style="background:var(--green-light);border-bottom:1px solid var(--border);padding:4px 16px;font-size:11px;color:var(--lime-dark);display:flex;align-items:center;gap:6px"><span>☁</span><span id="sync-status">Connecting to cloud…</span></div>
+<div id="sync-bar" style="background:var(--green-light);border-bottom:1px solid var(--border);padding:4px 16px;font-size:11px;color:var(--lime-dark);display:flex;align-items:center;gap:6px">
+  <span>☁</span><span id="sync-status">Connecting to cloud…</span>
+</div>
 <div class="admin-bar" id="admin-bar">
   <span>✏️ Admin edit mode — picks can be overwritten</span>
   <span class="atimer" id="admin-timer">60s remaining</span>
   <button class="aoff" onclick="exitAdmin()">Exit edit mode</button>
 </div>
+
 <div id="v-groups" class="view on"></div>
 <div id="v-knockout" class="view"></div>
 <div id="v-board" class="view"></div>
 
 <script>
+// ═══════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════
+const RENDER_URL = 'https://wc2026-picks.onrender.com';
+const API_KEY    = 'wc2026picks2026';
+
 // ═══════════════════════════════════════════════════════
 // DATA
 // ═══════════════════════════════════════════════════════
@@ -271,27 +274,19 @@ const GROUPS={
   K:{t:['Portugal','DR Congo','Uzbekistan','Colombia']},
   L:{t:['England','Croatia','Ghana','Panama']}
 };
-const GM=[[0,1],[2,3],[0,2],[1,3],[0,3],[1,2]]; // match pairs per group
+const GM=[[0,1],[2,3],[0,2],[1,3],[0,3],[1,2]];
 
-// Official FIFA Round of 32 matchup descriptors
-// '1X'=winner grp X, '2X'=runner-up grp X, '3rd'=best 3rd-place qualifier
 const R32_DESC=[
   ['2A','2B'],['1E','3rd'],['1F','2C'],['1C','2F'],
   ['1I','3rd'],['2E','2I'],['1A','3rd'],['1L','3rd'],
   ['1D','3rd'],['1G','3rd'],['2K','2L'],['1H','2J'],
   ['1B','3rd'],['1J','2H'],['1K','3rd'],['2D','2G']
 ];
-
-// Round of 16: pairs of R32 winners by index
 const R16_PAIRS=[[0,3],[1,2],[4,5],[6,7],[8,11],[9,10],[12,15],[13,14]];
-// QF: pairs of R16 winners
 const QF_PAIRS=[[0,1],[2,3],[4,5],[6,7]];
-// SF: pairs of QF winners
 const SF_PAIRS=[[0,1],[2,3]];
-// Final
 const F_PAIRS=[[0,1]];
 
-// Known actual results — seeded from real tournament data
 const SEED_G={
   'A-0':'t1','A-1':'t1',
   'B-0':'draw','B-1':'draw',
@@ -304,17 +299,95 @@ const SEED_G={
   'I-0':'t1'
 };
 
-// Knockout points multipliers
+
+// ═══════════════════════════════════════════════════════
+// MATCH KICKOFF SCHEDULE (UTC) — locks predictions at kickoff
+// ═══════════════════════════════════════════════════════
+const KICKOFFS = {
+  // Group A
+  'A-0':'2026-06-11T19:00:00Z','A-1':'2026-06-12T02:00:00Z',
+  'A-2':'2026-06-19T01:00:00Z','A-3':'2026-06-18T16:00:00Z',
+  'A-4':'2026-06-25T01:00:00Z','A-5':'2026-06-25T01:00:00Z',
+  // Group B
+  'B-0':'2026-06-12T19:00:00Z','B-1':'2026-06-13T19:00:00Z',
+  'B-2':'2026-06-24T19:00:00Z','B-3':'2026-06-24T19:00:00Z',
+  'B-4':'2026-06-18T22:00:00Z','B-5':'2026-06-18T19:00:00Z',
+  // Group C
+  'C-0':'2026-06-13T22:00:00Z','C-1':'2026-06-14T01:00:00Z',
+  'C-2':'2026-06-24T22:00:00Z','C-3':'2026-06-24T22:00:00Z',
+  'C-4':'2026-06-20T00:30:00Z','C-5':'2026-06-19T22:00:00Z',
+  // Group D
+  'D-0':'2026-06-13T01:00:00Z','D-1':'2026-06-13T04:00:00Z',
+  'D-2':'2026-06-19T19:00:00Z','D-3':'2026-06-20T03:00:00Z',
+  'D-4':'2026-06-26T02:00:00Z','D-5':'2026-06-26T02:00:00Z',
+  // Group E
+  'E-0':'2026-06-14T17:00:00Z','E-1':'2026-06-14T23:00:00Z',
+  'E-2':'2026-06-20T20:00:00Z','E-3':'2026-06-21T00:00:00Z',
+  'E-4':'2026-06-25T20:00:00Z','E-5':'2026-06-25T20:00:00Z',
+  // Group F
+  'F-0':'2026-06-14T20:00:00Z','F-1':'2026-06-15T02:00:00Z',
+  'F-2':'2026-06-20T17:00:00Z','F-3':'2026-06-21T04:00:00Z',
+  'F-4':'2026-06-25T23:00:00Z','F-5':'2026-06-25T23:00:00Z',
+  // Group G
+  'G-0':'2026-06-15T19:00:00Z','G-1':'2026-06-16T01:00:00Z',
+  'G-2':'2026-06-21T19:00:00Z','G-3':'2026-06-22T01:00:00Z',
+  'G-4':'2026-06-27T03:00:00Z','G-5':'2026-06-27T03:00:00Z',
+  // Group H
+  'H-0':'2026-06-15T16:00:00Z','H-1':'2026-06-15T22:00:00Z',
+  'H-2':'2026-06-21T16:00:00Z','H-3':'2026-06-21T22:00:00Z',
+  'H-4':'2026-06-27T00:00:00Z','H-5':'2026-06-27T00:00:00Z',
+  // Group I
+  'I-0':'2026-06-16T19:00:00Z','I-1':'2026-06-16T22:00:00Z',
+  'I-2':'2026-06-26T19:00:00Z','I-3':'2026-06-26T19:00:00Z',
+  'I-4':'2026-06-22T21:00:00Z','I-5':'2026-06-23T00:00:00Z',
+  // Group J
+  'J-0':'2026-06-17T01:00:00Z','J-1':'2026-06-17T04:00:00Z',
+  'J-2':'2026-06-22T17:00:00Z','J-3':'2026-06-23T03:00:00Z',
+  'J-4':'2026-06-28T02:00:00Z','J-5':'2026-06-28T02:00:00Z',
+  // Group K
+  'K-0':'2026-06-17T17:00:00Z','K-1':'2026-06-18T02:00:00Z',
+  'K-2':'2026-06-23T17:00:00Z','K-3':'2026-06-24T02:00:00Z',
+  'K-4':'2026-06-27T23:30:00Z','K-5':'2026-06-27T23:30:00Z',
+  // Group L
+  'L-0':'2026-06-17T20:00:00Z','L-1':'2026-06-17T23:00:00Z',
+  'L-2':'2026-06-23T21:00:00Z','L-3':'2026-06-24T00:00:00Z',
+  'L-4':'2026-06-28T00:00:00Z','L-5':'2026-06-28T00:00:00Z',
+};
+
+// Knockout stage kickoff dates (UTC) — predictions lock at round start
+const K_KICKOFFS = {
+  'R32': '2026-06-28T18:00:00Z',
+  'R16': '2026-07-04T18:00:00Z',
+  'QF':  '2026-07-09T18:00:00Z',
+  'SF':  '2026-07-14T18:00:00Z',
+  'F':   '2026-07-19T19:00:00Z',
+};
+
+function matchKickedOff(key) {
+  // For group matches, check the specific match kickoff
+  const ko = KICKOFFS[key];
+  if (ko) return Date.now() >= new Date(ko).getTime();
+  // For knockout, check the round kickoff
+  const rnd = key.split('-')[0];
+  const rko = K_KICKOFFS[rnd];
+  if (rko) return Date.now() >= new Date(rko).getTime();
+  return false;
+}
+
+function kickoffLabel(key) {
+  const ko = KICKOFFS[key];
+  if (!ko) return '';
+  const d = new Date(ko);
+  const now = Date.now();
+  if (now >= d.getTime()) return '';
+  // Show local time until kickoff
+  return d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'});
+}
+
 const K_PTS={R32:1,R16:2,QF:3,SF:4,F:6};
 
 // ═══════════════════════════════════════════════════════
-// CONFIG — set RENDER_URL to your Render service URL
-// ═══════════════════════════════════════════════════════
-const RENDER_URL = 'REPLACE_WITH_YOUR_RENDER_URL'; // e.g. https://wc2026-api.onrender.com
-const API_KEY    = 'REPLACE_WITH_YOUR_API_KEY';    // must match Render env var API_KEY
-
-// ═══════════════════════════════════════════════════════
-// STATE — cloud-backed via Render, localStorage as cache
+// STATE
 // ═══════════════════════════════════════════════════════
 let gPicks   = {1:{},2:{}};
 let kPicks   = {1:{},2:{}};
@@ -322,8 +395,8 @@ let gActuals = Object.assign({},SEED_G);
 let kActuals = {};
 let cp       = 1;
 let fetchStatus = '';
-let syncStatus  = '';
-let syncTimer   = null;
+let adminMode   = false;
+let adminCountdown = null;
 
 function localSave(){
   try{ localStorage.setItem('wc2026_cache',JSON.stringify({gPicks,kPicks,gActuals,kActuals})); }catch(e){}
@@ -339,15 +412,14 @@ function localLoad(){
 }
 
 function apiHeaders(){
-  return { 'Content-Type':'application/json', 'X-API-Key': API_KEY };
+  return {'Content-Type':'application/json','X-API-Key':API_KEY};
 }
 
-// Pull latest state from Render and merge into local
 async function cloudLoad(){
   try{
-    const r = await fetch(RENDER_URL+'/api/state', { headers: apiHeaders() });
+    const r=await fetch(RENDER_URL+'/api/state',{headers:apiHeaders()});
     if(!r.ok) throw new Error('HTTP '+r.status);
-    const d = await r.json();
+    const d=await r.json();
     if(d.gPicks)   gPicks   = d.gPicks;
     if(d.kPicks)   kPicks   = d.kPicks;
     if(d.gActuals) gActuals = Object.assign({},SEED_G,d.gActuals);
@@ -361,15 +433,14 @@ async function cloudLoad(){
   }
 }
 
-// Post a group pick to Render (override=true bypasses lock in admin mode)
-async function cloudPickG(player, key, result, override=false){
+async function cloudPickG(player,key,result,override=false){
   try{
-    const r = await fetch(RENDER_URL+'/api/pick/group', {
-      method:'POST', headers: apiHeaders(),
-      body: JSON.stringify({player, key, result, override})
+    const r=await fetch(RENDER_URL+'/api/pick/group',{
+      method:'POST',headers:apiHeaders(),
+      body:JSON.stringify({player,key,result,override})
     });
-    const d = await r.json();
-    if(r.status===409){ setSyncMsg('Already locked on server'); return false; }
+    const d=await r.json();
+    if(r.status===409){setSyncMsg('Already locked on server');return false;}
     if(!r.ok) throw new Error(d.error||'Error');
     localSave();
     setSyncMsg(override?'Pick corrected ✓':'Pick saved ✓');
@@ -380,15 +451,14 @@ async function cloudPickG(player, key, result, override=false){
   }
 }
 
-// Post a knockout pick to Render (override=true bypasses lock in admin mode)
-async function cloudPickK(player, key, team, override=false){
+async function cloudPickK(player,key,team,override=false){
   try{
-    const r = await fetch(RENDER_URL+'/api/pick/knockout', {
-      method:'POST', headers: apiHeaders(),
-      body: JSON.stringify({player, key, team, override})
+    const r=await fetch(RENDER_URL+'/api/pick/knockout',{
+      method:'POST',headers:apiHeaders(),
+      body:JSON.stringify({player,key,team,override})
     });
-    const d = await r.json();
-    if(r.status===409){ setSyncMsg('Already locked on server'); return false; }
+    const d=await r.json();
+    if(r.status===409){setSyncMsg('Already locked on server');return false;}
     if(!r.ok) throw new Error(d.error||'Error');
     localSave();
     setSyncMsg(override?'Pick corrected ✓':'Pick saved ✓');
@@ -399,27 +469,27 @@ async function cloudPickK(player, key, team, override=false){
   }
 }
 
-// Post updated actuals to Render
-async function cloudSaveActuals(group, knockout){
+async function cloudSaveActuals(group,knockout){
   try{
-    await fetch(RENDER_URL+'/api/actuals', {
-      method:'POST', headers: apiHeaders(),
-      body: JSON.stringify({group, knockout})
+    await fetch(RENDER_URL+'/api/actuals',{
+      method:'POST',headers:apiHeaders(),
+      body:JSON.stringify({group,knockout})
     });
-  }catch(e){ console.warn('Actuals sync failed',e); }
+  }catch(e){console.warn('Actuals sync failed',e);}
 }
 
 function setSyncMsg(msg){
-  syncStatus=msg;
   const el=document.getElementById('sync-status');
   if(el) el.textContent=msg;
 }
 
 // ═══════════════════════════════════════════════════════
-// STANDINGS + BRACKET RESOLUTION
+// STANDINGS + BRACKET
 // ═══════════════════════════════════════════════════════
+function gp(p){return gPicks[p]||gPicks[String(p)]||{};}
+function kp(p){return kPicks[p]||kPicks[String(p)]||{};}
+
 function groupStandings(g,src){
-  // src: 1, 2, or 'actual'
   const ts=GROUPS[g].t;
   const pts={},gd={},gs={};
   ts.forEach(t=>{pts[t]=0;gd[t]=0;gs[t]=0;});
@@ -431,12 +501,10 @@ function groupStandings(g,src){
     else if(r==='t2'){pts[t2]+=3;gd[t2]++;gd[t1]--;gs[t2]++;}
     else if(r==='draw'){pts[t1]++;pts[t2]++;gs[t1]++;gs[t2]++;}
   });
-  return ts.slice().sort((a,b)=>pts[b]-pts[a]||gd[b]-gd[a]||gs[b]-gs[a])
-           .map(t=>({t,pts:pts[t],gd:gd[t]}));
+  return ts.slice().sort((a,b)=>pts[b]-pts[a]||gd[b]-gd[a]||gs[b]-gs[a]).map(t=>({t,pts:pts[t],gd:gd[t]}));
 }
 
 function getQualified(){
-  // Returns {W:{A:team,...}, R:{A:team,...}} from actual results when full group done
   const W={},R={};
   Object.keys(GROUPS).forEach(g=>{
     const played=Object.keys(gActuals).filter(k=>k.startsWith(g+'-')).length;
@@ -459,17 +527,14 @@ function resolveDesc(d,W,R){
 
 function getKTeams(rnd,i){
   const {W,R}=getQualified();
-  if(rnd==='R32'){
-    return R32_DESC[i].map(d=>resolveDesc(d,W,R));
-  }
+  if(rnd==='R32') return R32_DESC[i].map(d=>resolveDesc(d,W,R));
   const prevRnd={R16:'R32',QF:'R16',SF:'QF',F:'SF'}[rnd];
   const pairsMap={R16:R16_PAIRS,QF:QF_PAIRS,SF:SF_PAIRS,F:F_PAIRS};
   const [ia,ib]=pairsMap[rnd][i];
   const get=idx=>{
     const ak=kActuals[prevRnd+'-'+idx];
     if(ak) return ak;
-    // show P1's pick as preview if available
-    return kPicks[1][prevRnd+'-'+idx]||('Winner M'+(idx+1));
+    return kp(1)[prevRnd+'-'+idx]||('Winner M'+(idx+1));
   };
   return [get(ia),get(ib)];
 }
@@ -481,17 +546,13 @@ function isTbd(team){
 // ═══════════════════════════════════════════════════════
 // SCORING
 // ═══════════════════════════════════════════════════════
-function gp(p){ return gPicks[p]||gPicks[String(p)]||{}; }
-function kp(p){ return kPicks[p]||kPicks[String(p)]||{}; }
-
 function calcScore(p){
-  let pts=0,decided=0,total=0;
-  const gpx=gp(p), kpx=kp(p);
+  let pts=0,decided=0;
+  const gpx=gp(p),kpx=kp(p);
   Object.keys(gActuals).forEach(k=>{
-    decided++; total++;
+    decided++;
     if(gpx[k]===gActuals[k]) pts++;
   });
-  total+=72-Object.keys(gActuals).length;
   ['R32','R16','QF','SF','F'].forEach(rnd=>{
     const n={R32:16,R16:8,QF:4,SF:2,F:1}[rnd];
     for(let i=0;i<n;i++){
@@ -539,17 +600,17 @@ function renderActive(){
 }
 
 // ═══════════════════════════════════════════════════════
-// GROUP STAGE RENDER
+// GROUP STAGE
 // ═══════════════════════════════════════════════════════
 async function pickG(g,mi,r){
   const k=g+'-'+mi;
   const p=String(cp);
-  // In normal mode, locked picks are final
+  if(!adminMode && matchKickedOff(k)) return; // past kickoff — time-locked
   if(!adminMode && gPicks[p] && gPicks[p][k]!==undefined) return;
   if(!gPicks[p]) gPicks[p]={};
   gPicks[p][k]=r;
   localSave(); updateBadges(); renderGroups();
-  await cloudPickG(cp, k, r, adminMode);
+  await cloudPickG(cp,k,r,adminMode);
 }
 
 function renderGroups(){
@@ -559,6 +620,7 @@ function renderGroups(){
     <div class="lsw" style="background:var(--orange-light);border:1px solid var(--orange);margin-left:4px"></div><span>${P2}</span>
     <div class="lsw" style="background:var(--lime-light);border:1px solid var(--lime);margin-left:4px"></div><span>${P1} draw</span>
     <div class="lsw" style="background:var(--amber-light);border:1px solid var(--amber);margin-left:4px"></div><span>${P2} draw</span>
+    <div class="lsw" style="background:linear-gradient(90deg,var(--blue-light) 50%,var(--orange-light) 50%);border:1px solid var(--green);margin-left:4px"></div><span>Both agree</span>
     <span style="margin-left:8px">🔒 = locked</span>
     <span style="color:var(--lime-dark)">✓ correct</span>
     <span style="color:var(--red-dark)">✗ wrong</span>
@@ -571,9 +633,11 @@ function renderGroups(){
       const k=g+'-'+mi, t1=ts[a], t2=ts[b];
       const p1=gp(1)[k], p2=gp(2)[k], ak=gActuals[k];
       const curLocked=(cp===1?gp(1)[k]:gp(2)[k])!==undefined;
-      const dis=(curLocked&&!adminMode)?'disabled':'';
+      const timeLocked = !adminMode && matchKickedOff(k);
+      const pickLocked = !adminMode && (cp===1?gp(1)[k]:gp(2)[k])!==undefined;
+      const dis=(timeLocked||pickLocked)?'disabled':'';
+      const kickoffStr = kickoffLabel(k);
 
-      // button classes — split highlight when both pick same
       const bc1=[];
       if(p1==='t1'&&p2==='t1') bc1.push('vboth');
       else { if(p1==='t1') bc1.push('vp1'); if(p2==='t1') bc1.push('vp2'); }
@@ -588,12 +652,12 @@ function renderGroups(){
         <button class="tbtn ${bc1.join(' ')}" onclick="pickG('${g}',${mi},'t1')" ${dis}>${t1}</button>
         <button class="dbtn ${bcd.join(' ')}" onclick="pickG('${g}',${mi},'draw')" ${dis}>Draw</button>
         <button class="tbtn ${bc2.join(' ')}" onclick="pickG('${g}',${mi},'t2')" ${dis}>${t2}</button>
-        ${curLocked?'<span style="font-size:9px;color:var(--subtle)">🔒</span>':''}
+        ${pickLocked?'<span style="font-size:9px;color:var(--subtle)" title="Your pick is locked">🔒</span>':timeLocked?'<span style="font-size:9px;color:var(--red-dark)" title="Match has started">⏰</span>':kickoffStr?`<span style="font-size:8px;color:var(--subtle);white-space:nowrap" title="Pick locks at kickoff">🕐 ${kickoffStr}</span>`:''}
       </div>`;
 
       if(ak||p1!==undefined||p2!==undefined){
         const winner=ak==='t1'?t1:ak==='t2'?t2:ak==='draw'?'Draw':null;
-        let ps1='', ps2='';
+        let ps1='',ps2='';
         if(p1!==undefined) ps1=`<span class="ptag ${ak?p1===ak?'ok':'no':'nd'}">${ak?p1===ak?'✓':'✗':'?'} ${P1}</span>`;
         if(p2!==undefined) ps2=`<span class="ptag ${ak?p2===ak?'ok':'no':'nd'}">${ak?p2===ak?'✓':'✗':'?'} ${P2}</span>`;
         h+=`<div class="arow"><span class="albl">Result:</span>
@@ -603,8 +667,7 @@ function renderGroups(){
       }
     });
 
-    // standings table
-    const hasAny=GM.some(([a,b],mi)=>gPicks[1][g+'-'+mi]!==undefined||gPicks[2][g+'-'+mi]!==undefined||gActuals[g+'-'+mi]!==undefined);
+    const hasAny=GM.some(([a,b],mi)=>gp(1)[g+'-'+mi]!==undefined||gp(2)[g+'-'+mi]!==undefined||gActuals[g+'-'+mi]!==undefined);
     if(hasAny){
       const st1=groupStandings(g,1),st2=groupStandings(g,2),stA=groupStandings(g,'actual');
       h+=`<table class="mini-t"><tr><th>Team</th><th style="color:var(--blue-dark)">${P1}</th><th style="color:var(--orange-dark)">${P2}</th><th>Actual</th></tr>`;
@@ -625,17 +688,18 @@ function renderGroups(){
 }
 
 // ═══════════════════════════════════════════════════════
-// KNOCKOUT RENDER
+// KNOCKOUT
 // ═══════════════════════════════════════════════════════
 async function pickK(rnd,i,team){
   if(isTbd(team)) return;
   const k=rnd+'-'+i;
   const p=String(cp);
+  if(!adminMode && matchKickedOff(k)) return; // round has started — time-locked
   if(!adminMode && kPicks[p] && kPicks[p][k]!==undefined) return;
   if(!kPicks[p]) kPicks[p]={};
   kPicks[p][k]=team;
   localSave(); updateBadges(); renderKnockout();
-  await cloudPickK(cp, k, team, adminMode);
+  await cloudPickK(cp,k,team,adminMode);
 }
 
 function renderKnockout(){
@@ -662,9 +726,10 @@ function renderKnockout(){
     for(let i=0;i<n;i++){
       const k=key+'-'+i;
       const [t1,t2]=getKTeams(key,i);
-      const p1w=kp(1)[k], p2w=kp(2)[k], ak=kActuals[k];
+      const p1w=kp(1)[k],p2w=kp(2)[k],ak=kActuals[k];
+      const timeLocked=!adminMode&&matchKickedOff(k);
       const curLocked=(cp===1?kp(1)[k]:kp(2)[k])!==undefined;
-      const tb1=isTbd(t1), tb2=isTbd(t2);
+      const tb1=isTbd(t1),tb2=isTbd(t2);
 
       function kc(team,tb){
         if(tb) return 'tbd';
@@ -672,7 +737,7 @@ function renderKnockout(){
         if(p1w===team&&p2w===team) return 'kboth';
         if(p1w===team) cls.push('kp1');
         if(p2w===team) cls.push('kp2');
-        if(curLocked&&!adminMode) cls.push('klocked');
+        if((curLocked||timeLocked)&&!adminMode) cls.push('klocked');
         return cls.join(' ');
       }
       function dots(team){
@@ -683,7 +748,7 @@ function renderKnockout(){
       }
 
       h+=`<div class="km">
-        <div class="kmlbl">Match ${i+1}${curLocked?' 🔒':''}</div>
+        <div class="kmlbl">Match ${i+1}${curLocked?' 🔒':timeLocked?' ⏰':''}</div>
         <div class="kt ${kc(t1,tb1)}" onclick="pickK('${key}',${i},'${(t1||'').replace(/'/g,"\\'")}')">
           <span>${t1||'TBD'}</span>${dots(t1)}
         </div>
@@ -691,7 +756,7 @@ function renderKnockout(){
           <span>${t2||'TBD'}</span>${dots(t2)}
         </div>`;
       if(ak){
-        const c1=p1w===ak, c2=p2w===ak;
+        const c1=p1w===ak,c2=p2w===ak;
         const cls=(!p1w&&!p2w)?'':c1||c2?'kok':'kwrong';
         h+=`<div class="kresult ${cls}">✔ ${ak}${p1w?' · '+P1+(c1?' ✓':' ✗'):''}${p2w?' · '+P2+(c2?' ✓':' ✗'):''}</div>`;
       } else if(p1w||p2w){
@@ -710,7 +775,7 @@ function renderKnockout(){
 async function refreshAll(btn){
   const icon=document.getElementById('ricon');
   const smsg=document.getElementById('smsg');
-  if(icon){icon.classList.add('spin');}
+  if(icon) icon.classList.add('spin');
   if(smsg) smsg.textContent='Fetching latest results…';
   try{
     const resp=await fetch('https://api.anthropic.com/v1/messages',{
@@ -739,12 +804,11 @@ Return pure JSON only. No markdown fences.`}]
     if(parsed.group) Object.assign(gActuals,parsed.group);
     if(parsed.knockout) Object.assign(kActuals,parsed.knockout);
     localSave();
-    // Push new actuals to cloud so other player sees them too
-    await cloudSaveActuals(parsed.group||{}, parsed.knockout||{});
+    await cloudSaveActuals(parsed.group||{},parsed.knockout||{});
     fetchStatus='Updated '+new Date().toLocaleTimeString();
     updateBadges();
     renderActive();
-  } catch(e){
+  }catch(e){
     fetchStatus='Update failed — try again';
     if(smsg) smsg.textContent=fetchStatus;
   }
@@ -760,9 +824,8 @@ function renderBoard(){
     <div class="sc-card s1"><div class="nm">${P1}</div><div class="pts">${s1.pts}</div><div class="sub">${s1.decided} matches decided</div></div>
     <div class="sc-card s2"><div class="nm">${P2}</div><div class="pts">${s2.pts}</div><div class="sub">${s2.decided} matches decided</div></div>
   </div>
-  <div class="sc-note">Points: group picks = 1pt · R16 = 1pt · QF = 3pts · SF = 4pts · Final = 6pts</div>`;
+  <div class="sc-note">Points: group picks = 1pt · R16 = 2pts · QF = 3pts · SF = 4pts · Final = 6pts</div>`;
 
-  // Group breakdown
   const decidedGs=Object.keys(gActuals);
   if(decidedGs.length){
     h+=`<div class="sc-table-wrap"><h3>Group stage results</h3><table class="sc-table">
@@ -780,7 +843,6 @@ function renderBoard(){
     h+=`</table></div>`;
   }
 
-  // Knockout breakdown
   const decidedKs=Object.keys(kActuals);
   if(decidedKs.length){
     h+=`<div class="sc-table-wrap"><h3>Knockout results</h3><table class="sc-table">
@@ -803,30 +865,21 @@ function renderBoard(){
 }
 
 // ═══════════════════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════════════════
-localLoad();          // show cached picks instantly
-setP(1);
-updateBadges();
-renderGroups();
-// Then pull fresh state from cloud
-cloudLoad().then(()=>{ updateBadges(); renderActive(); });
-// Auto-refresh from cloud every 60s so both players see each other's picks
-setInterval(()=>{ cloudLoad().then(()=>{ updateBadges(); renderActive(); }); }, 60000);
-
-
-// ═══════════════════════════════════════════════════════
 // ADMIN UNLOCK MODE
 // ═══════════════════════════════════════════════════════
-const ADMIN_SALT = 'wc2026admin';
-const ADMIN_CORRECT = hashStr(ADMIN_SALT + 'lt1983');
-let adminMode = false;
-let adminCountdown = null;
+function hashStr(str){
+  let h=0x811c9dc5;
+  for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=(h*0x01000193)>>>0;}
+  return h.toString(16).padStart(8,'0');
+}
+
+const ADMIN_SALT='wc2026admin';
+const ADMIN_CORRECT=hashStr(ADMIN_SALT+'lt1983');
 
 function promptAdmin(){
-  const pw = prompt('Enter admin code to enable edit mode:');
+  const pw=prompt('Enter admin code to enable edit mode:');
   if(!pw) return;
-  if(hashStr(ADMIN_SALT + pw) === ADMIN_CORRECT){
+  if(hashStr(ADMIN_SALT+pw)===ADMIN_CORRECT){
     enterAdmin();
   } else {
     alert('Incorrect admin code.');
@@ -834,24 +887,24 @@ function promptAdmin(){
 }
 
 function enterAdmin(){
-  adminMode = true;
-  let secs = 60;
+  adminMode=true;
+  let secs=60;
   document.getElementById('admin-bar').classList.add('on');
   document.body.classList.add('edit-mode');
-  document.getElementById('admin-timer').textContent = secs + 's remaining';
+  document.getElementById('admin-timer').textContent=secs+'s remaining';
   renderActive();
   if(adminCountdown) clearInterval(adminCountdown);
-  adminCountdown = setInterval(()=>{
+  adminCountdown=setInterval(()=>{
     secs--;
-    const el = document.getElementById('admin-timer');
-    if(el) el.textContent = secs + 's remaining';
-    if(secs <= 0) exitAdmin();
-  }, 1000);
+    const el=document.getElementById('admin-timer');
+    if(el) el.textContent=secs+'s remaining';
+    if(secs<=0) exitAdmin();
+  },1000);
 }
 
 function exitAdmin(){
-  adminMode = false;
-  if(adminCountdown){ clearInterval(adminCountdown); adminCountdown=null; }
+  adminMode=false;
+  if(adminCountdown){clearInterval(adminCountdown);adminCountdown=null;}
   document.getElementById('admin-bar').classList.remove('on');
   document.body.classList.remove('edit-mode');
   renderActive();
@@ -861,40 +914,35 @@ function exitAdmin(){
 // ═══════════════════════════════════════════════════════
 // PASSWORD GATE
 // ═══════════════════════════════════════════════════════
-const PW_HASH = '5e3d9e8f2b1c4a7d6f0e3b2a8c1d5f9e4b7a0c3d6e9f2b5a8c1d4e7f0a3b6';
+const SALT='wc2026lm';
+const CORRECT=hashStr(SALT+'h@ll0w33n');
 
-function hashStr(str) {
-  // Simple deterministic hash — not cryptographic, fine for casual protection
-  let h = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = (h * 0x01000193) >>> 0;
-  }
-  return h.toString(16).padStart(8,'0');
-}
-
-// We store a salted version so the plaintext isn't trivially obvious in source
-const SALT = 'wc2026lm';
-const CORRECT = hashStr(SALT + 'h@ll0w33n');
-
-function checkPw() {
-  const val = document.getElementById('pw-input').value;
-  const err = document.getElementById('gate-err');
-  if (hashStr(SALT + val) === CORRECT) {
+function checkPw(){
+  const val=document.getElementById('pw-input').value;
+  const err=document.getElementById('gate-err');
+  if(hashStr(SALT+val)===CORRECT){
     document.getElementById('gate').classList.add('hidden');
     sessionStorage.setItem('wc2026_auth','1');
   } else {
-    err.textContent = 'Incorrect password. Try again.';
-    document.getElementById('pw-input').value = '';
+    err.textContent='Incorrect password. Try again.';
+    document.getElementById('pw-input').value='';
     document.getElementById('pw-input').focus();
   }
 }
 
-// Auto-unlock if already authed this session
-if (sessionStorage.getItem('wc2026_auth') === '1') {
+if(sessionStorage.getItem('wc2026_auth')==='1'){
   document.getElementById('gate').classList.add('hidden');
 }
 
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+localLoad();
+setP(1);
+updateBadges();
+renderGroups();
+cloudLoad().then(()=>{updateBadges();renderActive();});
+setInterval(()=>{cloudLoad().then(()=>{updateBadges();renderActive();});},60000);
 </script>
 </body>
 </html>
