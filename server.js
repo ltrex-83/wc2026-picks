@@ -160,8 +160,7 @@ app.post('/api/refresh', requireKey, async (req, res) => {
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'tools-2024-04-04'
+        'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
@@ -184,11 +183,39 @@ Return pure JSON only. No markdown fences.`
     });
 
     const data = await response.json();
+
+    if (data.error) {
+      console.error('Anthropic API error:', JSON.stringify(data.error));
+      return res.status(500).json({ error: 'Anthropic API error', detail: data.error.message || JSON.stringify(data.error) });
+    }
+
     let raw = '';
     for (const c of (data.content || [])) {
       if (c.type === 'text') raw += c.text;
     }
-    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+
+    if (!raw || !raw.trim()) {
+      console.error('Empty response from Anthropic. Full payload:', JSON.stringify(data).slice(0, 2000));
+      return res.status(500).json({ error: 'Empty response from search', detail: 'No text content returned' });
+    }
+
+    // Extract JSON even if wrapped in prose or code fences
+    let jsonStr = raw.replace(/```json|```/g, '').trim();
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1) {
+      console.error('No JSON object found in response:', raw.slice(0, 1000));
+      return res.status(500).json({ error: 'No JSON found in response', detail: raw.slice(0, 500) });
+    }
+    jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (parseErr) {
+      console.error('JSON parse failed. Raw text was:', raw.slice(0, 1000));
+      return res.status(500).json({ error: 'Failed to parse search results', detail: parseErr.message });
+    }
 
     // Merge into stored actuals
     const state = readData();
