@@ -149,6 +149,26 @@
     .sc-card .pts { font-size: 28px; }
   }
 
+
+  /* ADMIN EDIT MODE */
+  .admin-bar {
+    display: none; background: #712B13; color: #fff;
+    padding: 6px 16px; font-size: 12px; font-weight: 500;
+    align-items: center; justify-content: space-between; gap: 8px;
+    flex-wrap: wrap;
+  }
+  .admin-bar.on { display: flex; }
+  .admin-bar .atimer { font-size: 11px; opacity: .85; }
+  .admin-bar .aoff { background: rgba(255,255,255,.2); border: none; color: #fff; padding: 3px 10px; border-radius: 12px; cursor: pointer; font-size: 11px; font-family: var(--font); }
+  .admin-bar .aoff:hover { background: rgba(255,255,255,.35); }
+  .edit-mode .tbtn[disabled], .edit-mode .dbtn[disabled] { cursor: pointer !important; opacity: 1 !important; border-style: dashed !important; }
+  .edit-mode .tbtn[disabled]:hover, .edit-mode .dbtn[disabled]:hover { border-color: #D85A30 !important; color: #D85A30 !important; }
+  .edit-mode .kt.klocked { cursor: pointer !important; }
+  .edit-mode .km { outline: 1.5px dashed #D85A30; outline-offset: 2px; border-radius: 8px; }
+  /* BOTH PICK — split highlight */
+  .vboth { background: linear-gradient(90deg, var(--blue-light) 50%, var(--orange-light) 50%) !important; border-color: var(--green) !important; color: var(--text) !important; font-weight: 600; }
+  .vdboth { background: linear-gradient(90deg, var(--lime-light) 50%, var(--amber-light) 50%) !important; border-color: var(--green) !important; font-weight: 600; }
+
   /* PASSWORD GATE */
   #gate {
     position: fixed; inset: 0; z-index: 9999;
@@ -208,6 +228,7 @@
     <button class="pbtn p1" id="btn1" onclick="setP(1)">Luis</button>
     <button class="pbtn" id="btn2" onclick="setP(2)">Melissa</button>
   </div>
+  <button class="pbtn" onclick="promptAdmin()" title="Admin unlock" style="font-size:11px;padding:4px 10px">🔑</button>
   <div class="scores">
     <span class="score-pill s1" id="sc1">Luis: 0</span>
     <span class="score-pill s2" id="sc2">Melissa: 0</span>
@@ -220,6 +241,12 @@
   <button class="tab" onclick="showV('board',this)">Scoreboard</button>
 </div>
 
+<div id="sync-bar" style="background:var(--green-light);border-bottom:1px solid var(--border);padding:4px 16px;font-size:11px;color:var(--lime-dark);display:flex;align-items:center;gap:6px"><span>☁</span><span id="sync-status">Connecting to cloud…</span></div>
+<div class="admin-bar" id="admin-bar">
+  <span>✏️ Admin edit mode — picks can be overwritten</span>
+  <span class="atimer" id="admin-timer">60s remaining</span>
+  <button class="aoff" onclick="exitAdmin()">Exit edit mode</button>
+</div>
 <div id="v-groups" class="view on"></div>
 <div id="v-knockout" class="view"></div>
 <div id="v-board" class="view"></div>
@@ -281,28 +308,112 @@ const SEED_G={
 const K_PTS={R32:1,R16:2,QF:3,SF:4,F:6};
 
 // ═══════════════════════════════════════════════════════
-// STATE — localStorage backed
+// CONFIG — set RENDER_URL to your Render service URL
 // ═══════════════════════════════════════════════════════
-function loadState(){
-  try{
-    const s=JSON.parse(localStorage.getItem('wc2026_state')||'{}');
-    return {
-      gPicks: s.gPicks||{1:{},2:{}},
-      kPicks: s.kPicks||{1:{},2:{}},
-      gActuals: Object.assign({},SEED_G,s.gActuals||{}),
-      kActuals: s.kActuals||{}
-    };
-  } catch(e){
-    return {gPicks:{1:{},2:{}},kPicks:{1:{},2:{}},gActuals:Object.assign({},SEED_G),kActuals:{}};
-  }
+const RENDER_URL = 'REPLACE_WITH_YOUR_RENDER_URL'; // e.g. https://wc2026-api.onrender.com
+const API_KEY    = 'REPLACE_WITH_YOUR_API_KEY';    // must match Render env var API_KEY
+
+// ═══════════════════════════════════════════════════════
+// STATE — cloud-backed via Render, localStorage as cache
+// ═══════════════════════════════════════════════════════
+let gPicks   = {1:{},2:{}};
+let kPicks   = {1:{},2:{}};
+let gActuals = Object.assign({},SEED_G);
+let kActuals = {};
+let cp       = 1;
+let fetchStatus = '';
+let syncStatus  = '';
+let syncTimer   = null;
+
+function localSave(){
+  try{ localStorage.setItem('wc2026_cache',JSON.stringify({gPicks,kPicks,gActuals,kActuals})); }catch(e){}
 }
-function saveState(){
-  try{ localStorage.setItem('wc2026_state',JSON.stringify({gPicks,kPicks,gActuals,kActuals})); } catch(e){}
+function localLoad(){
+  try{
+    const s=JSON.parse(localStorage.getItem('wc2026_cache')||'{}');
+    if(s.gPicks)   gPicks   = s.gPicks;
+    if(s.kPicks)   kPicks   = s.kPicks;
+    if(s.gActuals) gActuals = Object.assign({},SEED_G,s.gActuals);
+    if(s.kActuals) kActuals = s.kActuals;
+  }catch(e){}
 }
 
-let {gPicks,kPicks,gActuals,kActuals}=loadState();
-let cp=1;
-let fetchStatus='';
+function apiHeaders(){
+  return { 'Content-Type':'application/json', 'X-API-Key': API_KEY };
+}
+
+// Pull latest state from Render and merge into local
+async function cloudLoad(){
+  try{
+    const r = await fetch(RENDER_URL+'/api/state', { headers: apiHeaders() });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    if(d.gPicks)   gPicks   = d.gPicks;
+    if(d.kPicks)   kPicks   = d.kPicks;
+    if(d.gActuals) gActuals = Object.assign({},SEED_G,d.gActuals);
+    if(d.kActuals) kActuals = d.kActuals;
+    localSave();
+    setSyncMsg('Synced '+new Date().toLocaleTimeString());
+    return true;
+  }catch(e){
+    setSyncMsg('Offline — using cached picks');
+    return false;
+  }
+}
+
+// Post a group pick to Render (override=true bypasses lock in admin mode)
+async function cloudPickG(player, key, result, override=false){
+  try{
+    const r = await fetch(RENDER_URL+'/api/pick/group', {
+      method:'POST', headers: apiHeaders(),
+      body: JSON.stringify({player, key, result, override})
+    });
+    const d = await r.json();
+    if(r.status===409){ setSyncMsg('Already locked on server'); return false; }
+    if(!r.ok) throw new Error(d.error||'Error');
+    localSave();
+    setSyncMsg(override?'Pick corrected ✓':'Pick saved ✓');
+    return true;
+  }catch(e){
+    setSyncMsg('Save failed — check connection');
+    return false;
+  }
+}
+
+// Post a knockout pick to Render (override=true bypasses lock in admin mode)
+async function cloudPickK(player, key, team, override=false){
+  try{
+    const r = await fetch(RENDER_URL+'/api/pick/knockout', {
+      method:'POST', headers: apiHeaders(),
+      body: JSON.stringify({player, key, team, override})
+    });
+    const d = await r.json();
+    if(r.status===409){ setSyncMsg('Already locked on server'); return false; }
+    if(!r.ok) throw new Error(d.error||'Error');
+    localSave();
+    setSyncMsg(override?'Pick corrected ✓':'Pick saved ✓');
+    return true;
+  }catch(e){
+    setSyncMsg('Save failed — check connection');
+    return false;
+  }
+}
+
+// Post updated actuals to Render
+async function cloudSaveActuals(group, knockout){
+  try{
+    await fetch(RENDER_URL+'/api/actuals', {
+      method:'POST', headers: apiHeaders(),
+      body: JSON.stringify({group, knockout})
+    });
+  }catch(e){ console.warn('Actuals sync failed',e); }
+}
+
+function setSyncMsg(msg){
+  syncStatus=msg;
+  const el=document.getElementById('sync-status');
+  if(el) el.textContent=msg;
+}
 
 // ═══════════════════════════════════════════════════════
 // STANDINGS + BRACKET RESOLUTION
@@ -314,7 +425,7 @@ function groupStandings(g,src){
   ts.forEach(t=>{pts[t]=0;gd[t]=0;gs[t]=0;});
   GM.forEach(([a,b],mi)=>{
     const k=g+'-'+mi;
-    const r=src==='actual'?gActuals[k]:gPicks[src][k];
+    const r=src==='actual'?gActuals[k]:(gPicks[src]||gPicks[String(src)]||{})[k];
     const t1=ts[a],t2=ts[b];
     if(r==='t1'){pts[t1]+=3;gd[t1]++;gd[t2]--;gs[t1]++;}
     else if(r==='t2'){pts[t2]+=3;gd[t2]++;gd[t1]--;gs[t2]++;}
@@ -370,21 +481,24 @@ function isTbd(team){
 // ═══════════════════════════════════════════════════════
 // SCORING
 // ═══════════════════════════════════════════════════════
+function gp(p){ return gPicks[p]||gPicks[String(p)]||{}; }
+function kp(p){ return kPicks[p]||kPicks[String(p)]||{}; }
+
 function calcScore(p){
   let pts=0,decided=0,total=0;
+  const gpx=gp(p), kpx=kp(p);
   Object.keys(gActuals).forEach(k=>{
     decided++; total++;
-    if(gPicks[p][k]===gActuals[k]) pts++;
+    if(gpx[k]===gActuals[k]) pts++;
   });
-  // count all possible group picks as total
-  total+=72-Object.keys(gActuals).length; // rough — show decided only
+  total+=72-Object.keys(gActuals).length;
   ['R32','R16','QF','SF','F'].forEach(rnd=>{
     const n={R32:16,R16:8,QF:4,SF:2,F:1}[rnd];
     for(let i=0;i<n;i++){
       const k=rnd+'-'+i;
       if(kActuals[k]!==undefined){
         decided++;
-        if(kPicks[p][k]===kActuals[k]) pts+=K_PTS[rnd];
+        if(kpx[k]===kActuals[k]) pts+=K_PTS[rnd];
       }
     }
   });
@@ -427,11 +541,15 @@ function renderActive(){
 // ═══════════════════════════════════════════════════════
 // GROUP STAGE RENDER
 // ═══════════════════════════════════════════════════════
-function pickG(g,mi,r){
+async function pickG(g,mi,r){
   const k=g+'-'+mi;
-  if(gPicks[cp][k]!==undefined) return;
-  gPicks[cp][k]=r;
-  saveState(); updateBadges(); renderGroups();
+  const p=String(cp);
+  // In normal mode, locked picks are final
+  if(!adminMode && gPicks[p] && gPicks[p][k]!==undefined) return;
+  if(!gPicks[p]) gPicks[p]={};
+  gPicks[p][k]=r;
+  localSave(); updateBadges(); renderGroups();
+  await cloudPickG(cp, k, r, adminMode);
 }
 
 function renderGroups(){
@@ -451,14 +569,20 @@ function renderGroups(){
     h+=`<div class="gc"><span class="gtag">GROUP ${g}</span>`;
     GM.forEach(([a,b],mi)=>{
       const k=g+'-'+mi, t1=ts[a], t2=ts[b];
-      const p1=gPicks[1][k], p2=gPicks[2][k], ak=gActuals[k];
-      const curLocked=(cp===1?p1:p2)!==undefined;
-      const dis=curLocked?'disabled':'';
+      const p1=gp(1)[k], p2=gp(2)[k], ak=gActuals[k];
+      const curLocked=(cp===1?gp(1)[k]:gp(2)[k])!==undefined;
+      const dis=(curLocked&&!adminMode)?'disabled':'';
 
-      // button classes
-      const bc1=[]; if(p1==='t1') bc1.push('vp1'); if(p2==='t1') bc1.push('vp2');
-      const bc2=[]; if(p1==='t2') bc2.push('vp1'); if(p2==='t2') bc2.push('vp2');
-      const bcd=[]; if(p1==='draw') bcd.push('vdp1'); if(p2==='draw') bcd.push('vdp2');
+      // button classes — split highlight when both pick same
+      const bc1=[];
+      if(p1==='t1'&&p2==='t1') bc1.push('vboth');
+      else { if(p1==='t1') bc1.push('vp1'); if(p2==='t1') bc1.push('vp2'); }
+      const bc2=[];
+      if(p1==='t2'&&p2==='t2') bc2.push('vboth');
+      else { if(p1==='t2') bc2.push('vp1'); if(p2==='t2') bc2.push('vp2'); }
+      const bcd=[];
+      if(p1==='draw'&&p2==='draw') bcd.push('vdboth');
+      else { if(p1==='draw') bcd.push('vdp1'); if(p2==='draw') bcd.push('vdp2'); }
 
       h+=`<div class="mrow">
         <button class="tbtn ${bc1.join(' ')}" onclick="pickG('${g}',${mi},'t1')" ${dis}>${t1}</button>
@@ -503,12 +627,15 @@ function renderGroups(){
 // ═══════════════════════════════════════════════════════
 // KNOCKOUT RENDER
 // ═══════════════════════════════════════════════════════
-function pickK(rnd,i,team){
+async function pickK(rnd,i,team){
   if(isTbd(team)) return;
   const k=rnd+'-'+i;
-  if(kPicks[cp][k]!==undefined) return;
-  kPicks[cp][k]=team;
-  saveState(); updateBadges(); renderKnockout();
+  const p=String(cp);
+  if(!adminMode && kPicks[p] && kPicks[p][k]!==undefined) return;
+  if(!kPicks[p]) kPicks[p]={};
+  kPicks[p][k]=team;
+  localSave(); updateBadges(); renderKnockout();
+  await cloudPickK(cp, k, team, adminMode);
 }
 
 function renderKnockout(){
@@ -535,8 +662,8 @@ function renderKnockout(){
     for(let i=0;i<n;i++){
       const k=key+'-'+i;
       const [t1,t2]=getKTeams(key,i);
-      const p1w=kPicks[1][k], p2w=kPicks[2][k], ak=kActuals[k];
-      const curLocked=(cp===1?p1w:p2w)!==undefined;
+      const p1w=kp(1)[k], p2w=kp(2)[k], ak=kActuals[k];
+      const curLocked=(cp===1?kp(1)[k]:kp(2)[k])!==undefined;
       const tb1=isTbd(t1), tb2=isTbd(t2);
 
       function kc(team,tb){
@@ -545,7 +672,7 @@ function renderKnockout(){
         if(p1w===team&&p2w===team) return 'kboth';
         if(p1w===team) cls.push('kp1');
         if(p2w===team) cls.push('kp2');
-        if(curLocked) cls.push('klocked');
+        if(curLocked&&!adminMode) cls.push('klocked');
         return cls.join(' ');
       }
       function dots(team){
@@ -611,7 +738,9 @@ Return pure JSON only. No markdown fences.`}]
     const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
     if(parsed.group) Object.assign(gActuals,parsed.group);
     if(parsed.knockout) Object.assign(kActuals,parsed.knockout);
-    saveState();
+    localSave();
+    // Push new actuals to cloud so other player sees them too
+    await cloudSaveActuals(parsed.group||{}, parsed.knockout||{});
     fetchStatus='Updated '+new Date().toLocaleTimeString();
     updateBadges();
     renderActive();
@@ -644,7 +773,7 @@ function renderBoard(){
       const t1=GROUPS[g].t[a],t2=GROUPS[g].t[b];
       const ak=gActuals[k];
       const w=ak==='t1'?t1:ak==='t2'?t2:'Draw';
-      const p1=gPicks[1][k],p2=gPicks[2][k];
+      const p1=gp(1)[k],p2=gp(2)[k];
       const fx=p=>p?p===ak?`<span style="color:var(--lime-dark);font-weight:600">✓</span>`:`<span style="color:var(--red-dark);font-weight:600">✗</span>`:'<span style="color:var(--subtle)">—</span>';
       h+=`<tr><td>${t1} v ${t2}</td><td style="color:var(--blue-dark)">${w}</td><td style="text-align:center">${fx(p1)}</td><td style="text-align:center">${fx(p2)}</td></tr>`;
     });
@@ -658,7 +787,7 @@ function renderBoard(){
     <tr><th>Round</th><th>Winner</th><th style="color:var(--blue-dark)">${P1}</th><th style="color:var(--orange-dark)">${P2}</th></tr>`;
     decidedKs.forEach(k=>{
       const ak=kActuals[k];
-      const p1=kPicks[1][k],p2=kPicks[2][k];
+      const p1=kp(1)[k],p2=kp(2)[k];
       const rnd=k.split('-')[0];
       const pts=K_PTS[rnd];
       const fx=p=>p?p===ak?`<span style="color:var(--lime-dark);font-weight:600">✓ +${pts}</span>`:`<span style="color:var(--red-dark);font-weight:600">✗</span>`:'<span style="color:var(--subtle)">—</span>';
@@ -676,9 +805,58 @@ function renderBoard(){
 // ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
+localLoad();          // show cached picks instantly
 setP(1);
 updateBadges();
 renderGroups();
+// Then pull fresh state from cloud
+cloudLoad().then(()=>{ updateBadges(); renderActive(); });
+// Auto-refresh from cloud every 60s so both players see each other's picks
+setInterval(()=>{ cloudLoad().then(()=>{ updateBadges(); renderActive(); }); }, 60000);
+
+
+// ═══════════════════════════════════════════════════════
+// ADMIN UNLOCK MODE
+// ═══════════════════════════════════════════════════════
+const ADMIN_SALT = 'wc2026admin';
+const ADMIN_CORRECT = hashStr(ADMIN_SALT + 'lt1983');
+let adminMode = false;
+let adminCountdown = null;
+
+function promptAdmin(){
+  const pw = prompt('Enter admin code to enable edit mode:');
+  if(!pw) return;
+  if(hashStr(ADMIN_SALT + pw) === ADMIN_CORRECT){
+    enterAdmin();
+  } else {
+    alert('Incorrect admin code.');
+  }
+}
+
+function enterAdmin(){
+  adminMode = true;
+  let secs = 60;
+  document.getElementById('admin-bar').classList.add('on');
+  document.body.classList.add('edit-mode');
+  document.getElementById('admin-timer').textContent = secs + 's remaining';
+  renderActive();
+  if(adminCountdown) clearInterval(adminCountdown);
+  adminCountdown = setInterval(()=>{
+    secs--;
+    const el = document.getElementById('admin-timer');
+    if(el) el.textContent = secs + 's remaining';
+    if(secs <= 0) exitAdmin();
+  }, 1000);
+}
+
+function exitAdmin(){
+  adminMode = false;
+  if(adminCountdown){ clearInterval(adminCountdown); adminCountdown=null; }
+  document.getElementById('admin-bar').classList.remove('on');
+  document.body.classList.remove('edit-mode');
+  renderActive();
+  setSyncMsg('Edit mode closed');
+}
 
 // ═══════════════════════════════════════════════════════
 // PASSWORD GATE
