@@ -778,39 +778,23 @@ async function refreshAll(btn){
   if(icon) icon.classList.add('spin');
   if(smsg) smsg.textContent='Fetching latest results…';
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+    const resp=await fetch(RENDER_URL+'/api/refresh',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-6',
-        max_tokens:1500,
-        tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:[{role:'user',content:`Search for all completed 2026 FIFA World Cup match results. Return ONLY valid JSON with two keys: "group" and "knockout".
-
-"group" keys: "A-0" to "L-5". Match index per group: 0=[t1 vs t2], 1=[t3 vs t4], 2=[t1 vs t3], 3=[t2 vs t4], 4=[t1 vs t4], 5=[t2 vs t3].
-Teams: A=[Mexico,SouthAfrica,SouthKorea,Czechia] B=[Canada,Bosnia,Switzerland,Qatar] C=[Brazil,Morocco,Scotland,Haiti] D=[USA,Paraguay,Australia,Turkiye] E=[Germany,Curacao,IvoryCoast,Ecuador] F=[Netherlands,Japan,Sweden,Tunisia] G=[Belgium,Egypt,Iran,NewZealand] H=[Spain,CapeVerde,SaudiArabia,Uruguay] I=[France,Senegal,Norway,Iraq] J=[Argentina,Algeria,Austria,Jordan] K=[Portugal,DRCongo,Uzbekistan,Colombia] L=[England,Croatia,Ghana,Panama]
-Values: "t1"=first team wins, "t2"=second team wins, "draw"=draw. Only completed matches.
-
-"knockout" keys: "R32-0" to "R32-15", "R16-0" to "R16-7", "QF-0" to "QF-3", "SF-0" to "SF-1", "F-0".
-Value = exact winning team name string. Only completed knockout matches.
-
-Return pure JSON only. No markdown fences.`}]
-      })
+      headers:apiHeaders()
     });
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
     const data=await resp.json();
-    let raw='';
-    for(const c of(data.content||[])) if(c.type==='text') raw+=c.text;
-    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
-    if(parsed.group) Object.assign(gActuals,parsed.group);
-    if(parsed.knockout) Object.assign(kActuals,parsed.knockout);
+    if(data.group) Object.assign(gActuals,data.group);
+    if(data.knockout) Object.assign(kActuals,data.knockout);
     localSave();
-    await cloudSaveActuals(parsed.group||{},parsed.knockout||{});
     fetchStatus='Updated '+new Date().toLocaleTimeString();
     updateBadges();
     renderActive();
+    setSyncMsg('Results refreshed ✓ '+new Date().toLocaleTimeString());
   }catch(e){
     fetchStatus='Update failed — try again';
     if(smsg) smsg.textContent=fetchStatus;
+    setSyncMsg('Refresh failed — try again');
   }
   if(icon) icon.classList.remove('spin');
 }
