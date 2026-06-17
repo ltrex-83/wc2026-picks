@@ -942,7 +942,7 @@ setP(1);
 updateBadges();
 renderGroups();
 cloudLoad().then(()=>{updateBadges();renderActive();});
-setInterval(()=>{cloudLoad().then(()=>{updateBadges();renderActive();});},60000);
+setInterval(()=>{cloudLoad().then(()=>{updateBadges();renderActive();});},15000);
 </script>
 </body>
 </html>
