@@ -216,14 +216,18 @@ async function performRefresh() {
       tools: [{ type: 'web_search_20250305', name: 'web_search' }],
       messages: [{
         role: 'user',
-        content: `Search for all completed 2026 FIFA World Cup match results. Return ONLY valid JSON with two keys: "group" and "knockout".
+        content: `Search for 2026 FIFA World Cup match results. I need ONLY matches that have FULLY FINISHED (full-time/final whistle blown, including any added stoppage time, extra time, or penalty shootout if applicable).
+
+CRITICAL: Do NOT include matches that are currently in progress — not at half-time, not in the second half, not in extra time, not "live". A match leading 1-0 at half-time is NOT a result; only report it if the match has reached full-time and the final whistle has blown. If a source shows a live or in-play score, exclude that match entirely from your answer. When uncertain whether a match has finished, exclude it — it is far better to omit a match than to report an in-progress score as final.
+
+Return ONLY valid JSON with two keys: "group" and "knockout".
 
 "group" keys: "A-0" to "L-5". Match index per group: 0=[t1 vs t2], 1=[t3 vs t4], 2=[t1 vs t3], 3=[t2 vs t4], 4=[t1 vs t4], 5=[t2 vs t3].
 Teams: A=[Mexico,SouthAfrica,SouthKorea,Czechia] B=[Canada,Bosnia,Switzerland,Qatar] C=[Brazil,Morocco,Scotland,Haiti] D=[USA,Paraguay,Australia,Turkiye] E=[Germany,Curacao,IvoryCoast,Ecuador] F=[Netherlands,Japan,Sweden,Tunisia] G=[Belgium,Egypt,Iran,NewZealand] H=[Spain,CapeVerde,SaudiArabia,Uruguay] I=[France,Senegal,Norway,Iraq] J=[Argentina,Algeria,Austria,Jordan] K=[Portugal,DRCongo,Uzbekistan,Colombia] L=[England,Croatia,Ghana,Panama]
-Values: "t1"=first team wins, "t2"=second team wins, "draw"=draw. Only completed matches.
+Values: "t1"=first team wins, "t2"=second team wins, "draw"=draw. Only fully completed matches.
 
 "knockout" keys: "R32-0" to "R32-15", "R16-0" to "R16-7", "QF-0" to "QF-3", "SF-0" to "SF-1", "F-0".
-Value = exact winning team name string. Only completed knockout matches.
+Value = exact winning team name string. Only fully completed knockout matches (factor in extra time/penalties if applicable).
 
 Return pure JSON only. No markdown fences.`
       }]
@@ -256,11 +260,33 @@ Return pure JSON only. No markdown fences.`
   const parsed = JSON.parse(jsonStr);
 
   const state = readData();
-  if (parsed.group) Object.assign(state.gActuals, parsed.group);
-  if (parsed.knockout) Object.assign(state.kActuals, parsed.knockout);
+
+  // Append-only merge: never overwrite an already-recorded actual result.
+  // Once a match result is stored, only a manual admin correction (via the
+  // app's admin mode) can change it — automated refreshes only fill in
+  // matches that don't have a recorded result yet. This prevents an
+  // in-progress or misread score from silently flipping a correct result.
+  const newGroupResults = {};
+  if (parsed.group) {
+    for (const [k, v] of Object.entries(parsed.group)) {
+      if (state.gActuals[k] === undefined) {
+        state.gActuals[k] = v;
+        newGroupResults[k] = v;
+      }
+    }
+  }
+  const newKnockoutResults = {};
+  if (parsed.knockout) {
+    for (const [k, v] of Object.entries(parsed.knockout)) {
+      if (state.kActuals[k] === undefined) {
+        state.kActuals[k] = v;
+        newKnockoutResults[k] = v;
+      }
+    }
+  }
   writeData(state);
 
-  return { group: parsed.group || {}, knockout: parsed.knockout || {} };
+  return { group: newGroupResults, knockout: newKnockoutResults };
 }
 
 // ── Manual refresh endpoint (button in the UI) ─────────────────────────
