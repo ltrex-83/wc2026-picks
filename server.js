@@ -73,6 +73,60 @@ const K_KICKOFFS = {
   'F':   '2026-07-19T19:00:00Z',
 };
 
+// ── Group definitions — used to map API-Football team names to match keys ──
+const GROUPS = {
+  A: ['Mexico','South Africa','South Korea','Czechia'],
+  B: ['Canada','Bosnia and Herzegovina','Switzerland','Qatar'],
+  C: ['Brazil','Morocco','Scotland','Haiti'],
+  D: ['USA','Paraguay','Australia','Turkey'],
+  E: ['Germany','Curacao','Ivory Coast','Ecuador'],
+  F: ['Netherlands','Japan','Sweden','Tunisia'],
+  G: ['Belgium','Egypt','Iran','New Zealand'],
+  H: ['Spain','Cape Verde','Saudi Arabia','Uruguay'],
+  I: ['France','Senegal','Norway','Iraq'],
+  J: ['Argentina','Algeria','Austria','Jordan'],
+  K: ['Portugal','DR Congo','Uzbekistan','Colombia'],
+  L: ['England','Croatia','Ghana','Panama'],
+};
+// Match index per group: 0=[t0,t1], 1=[t2,t3], 2=[t0,t2], 3=[t1,t3], 4=[t0,t3], 5=[t1,t2]
+const GM = [[0,1],[2,3],[0,2],[1,3],[0,3],[1,2]];
+
+// Alternate spellings API-Football may use, mapped to our canonical names above
+const NAME_ALIASES = {
+  'Bosnia-Herzegovina': 'Bosnia and Herzegovina',
+  'Türkiye': 'Turkey',
+  'Côte d\'Ivoire': 'Ivory Coast',
+  'Curaçao': 'Curacao',
+  'Korea Republic': 'South Korea',
+  'South Korea Republic': 'South Korea',
+  'USA': 'United States',
+};
+
+function normalizeTeamName(name) {
+  if (!name) return name;
+  const mapped = NAME_ALIASES[name];
+  return mapped || name;
+}
+
+// Find which group + match-index a fixture between two teams corresponds to
+function findMatchKey(homeTeam, awayTeam) {
+  const home = normalizeTeamName(homeTeam);
+  const away = normalizeTeamName(awayTeam);
+  for (const [g, teams] of Object.entries(GROUPS)) {
+    const normTeams = teams.map(normalizeTeamName);
+    const hi = normTeams.indexOf(home);
+    const ai = normTeams.indexOf(away);
+    if (hi === -1 || ai === -1) continue;
+    for (let mi = 0; mi < GM.length; mi++) {
+      const [a, b] = GM[mi];
+      if ((a === hi && b === ai) || (a === ai && b === hi)) {
+        return { key: `${g}-${mi}`, isReversed: a === ai };
+      }
+    }
+  }
+  return null;
+}
+
 // Data helpers
 const SEED_ACTUALS = {
   'A-0':'t1','A-1':'t1',
@@ -193,6 +247,20 @@ app.post('/api/actuals', requireKey, (req, res) => {
   res.json({ success: true, gActuals: data.gActuals, kActuals: data.kActuals });
 });
 
+// ── Diagnostic: check API-Football coverage for league=1, season=2026 ──
+// Hit this once after deploying to confirm the free tier includes World Cup data.
+app.get('/api/check-coverage', requireKey, async (req, res) => {
+  try {
+    const response = await fetch('https://v3.football.api-sports.io/leagues?id=1&season=2026', {
+      headers: { 'x-apisports-key': process.env.API_FOOTBALL_KEY }
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: 'Coverage check failed', detail: e.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`WC2026 API running on port ${PORT}`);
   const dir = path.dirname(DATA_FILE);
@@ -202,88 +270,68 @@ app.listen(PORT, () => {
 });
 
 // ── Core refresh logic — shared by manual button + scheduler ──────────
+// Uses API-Football (v3.football.api-sports.io) which returns an explicit
+// match status field (FT = full-time confirmed, HT/1H/2H = in progress).
+// This eliminates the half-time-misread-as-final bug entirely, since we
+// never have to infer match state from search text — the API tells us.
 async function performRefresh() {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
+  const response = await fetch('https://v3.football.api-sports.io/fixtures?league=1&season=2026', {
+    method: 'GET',
     headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1500,
-      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-      messages: [{
-        role: 'user',
-        content: `Search for 2026 FIFA World Cup match results. I need ONLY matches that have FULLY FINISHED (full-time/final whistle blown, including any added stoppage time, extra time, or penalty shootout if applicable).
-
-CRITICAL: Do NOT include matches that are currently in progress — not at half-time, not in the second half, not in extra time, not "live". A match leading 1-0 at half-time is NOT a result; only report it if the match has reached full-time and the final whistle has blown. If a source shows a live or in-play score, exclude that match entirely from your answer. When uncertain whether a match has finished, exclude it — it is far better to omit a match than to report an in-progress score as final.
-
-Return ONLY valid JSON with two keys: "group" and "knockout".
-
-"group" keys: "A-0" to "L-5". Match index per group: 0=[t1 vs t2], 1=[t3 vs t4], 2=[t1 vs t3], 3=[t2 vs t4], 4=[t1 vs t4], 5=[t2 vs t3].
-Teams: A=[Mexico,SouthAfrica,SouthKorea,Czechia] B=[Canada,Bosnia,Switzerland,Qatar] C=[Brazil,Morocco,Scotland,Haiti] D=[USA,Paraguay,Australia,Turkiye] E=[Germany,Curacao,IvoryCoast,Ecuador] F=[Netherlands,Japan,Sweden,Tunisia] G=[Belgium,Egypt,Iran,NewZealand] H=[Spain,CapeVerde,SaudiArabia,Uruguay] I=[France,Senegal,Norway,Iraq] J=[Argentina,Algeria,Austria,Jordan] K=[Portugal,DRCongo,Uzbekistan,Colombia] L=[England,Croatia,Ghana,Panama]
-Values: "t1"=first team wins, "t2"=second team wins, "draw"=draw. Only fully completed matches.
-
-"knockout" keys: "R32-0" to "R32-15", "R16-0" to "R16-7", "QF-0" to "QF-3", "SF-0" to "SF-1", "F-0".
-Value = exact winning team name string. Only fully completed knockout matches (factor in extra time/penalties if applicable).
-
-Return pure JSON only. No markdown fences.`
-      }]
-    })
+      'x-apisports-key': process.env.API_FOOTBALL_KEY
+    }
   });
+
+  if (!response.ok) {
+    throw new Error(`API-Football HTTP error: ${response.status}`);
+  }
 
   const data = await response.json();
 
-  if (data.error) {
-    throw new Error('Anthropic API error: ' + (data.error.message || JSON.stringify(data.error)));
+  if (data.errors && Object.keys(data.errors).length > 0) {
+    throw new Error('API-Football error: ' + JSON.stringify(data.errors));
   }
 
-  let raw = '';
-  for (const c of (data.content || [])) {
-    if (c.type === 'text') raw += c.text;
-  }
-
-  if (!raw || !raw.trim()) {
-    throw new Error('Empty response from search');
-  }
-
-  let jsonStr = raw.replace(/```json|```/g, '').trim();
-  const firstBrace = jsonStr.indexOf('{');
-  const lastBrace = jsonStr.lastIndexOf('}');
-  if (firstBrace === -1 || lastBrace === -1) {
-    throw new Error('No JSON found in response: ' + raw.slice(0, 300));
-  }
-  jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
-
-  const parsed = JSON.parse(jsonStr);
-
+  const fixtures = data.response || [];
   const state = readData();
 
-  // Append-only merge: never overwrite an already-recorded actual result.
-  // Once a match result is stored, only a manual admin correction (via the
-  // app's admin mode) can change it — automated refreshes only fill in
-  // matches that don't have a recorded result yet. This prevents an
-  // in-progress or misread score from silently flipping a correct result.
   const newGroupResults = {};
-  if (parsed.group) {
-    for (const [k, v] of Object.entries(parsed.group)) {
-      if (state.gActuals[k] === undefined) {
-        state.gActuals[k] = v;
-        newGroupResults[k] = v;
-      }
-    }
-  }
   const newKnockoutResults = {};
-  if (parsed.knockout) {
-    for (const [k, v] of Object.entries(parsed.knockout)) {
-      if (state.kActuals[k] === undefined) {
-        state.kActuals[k] = v;
-        newKnockoutResults[k] = v;
-      }
+
+  for (const fixture of fixtures) {
+    const status = fixture.fixture?.status?.short; // e.g. "FT", "HT", "1H", "2H", "NS", "AET", "PEN"
+    const homeTeam = fixture.teams?.home?.name;
+    const awayTeam = fixture.teams?.away?.name;
+    const homeGoals = fixture.goals?.home;
+    const awayGoals = fixture.goals?.away;
+
+    // Only treat as final if status explicitly indicates the match has concluded.
+    // FT = full-time, AET = after extra time, PEN = decided on penalties.
+    // Explicitly exclude: NS (not started), 1H, HT, 2H, ET, LIVE, BT (break time), P (penalty in progress), SUSP, INT
+    const FINAL_STATUSES = new Set(['FT', 'AET', 'PEN']);
+    if (!FINAL_STATUSES.has(status)) continue;
+    if (homeGoals === null || awayGoals === null || homeGoals === undefined || awayGoals === undefined) continue;
+
+    const match = findMatchKey(homeTeam, awayTeam);
+    if (!match) continue; // not a group-stage match we're tracking (could be knockout — handled separately if needed)
+
+    let result;
+    if (homeGoals === awayGoals) {
+      result = 'draw';
+    } else {
+      const homeWon = homeGoals > awayGoals;
+      // match.isReversed means API's "home" team is our t2 (second team in the pair)
+      const t1Won = match.isReversed ? !homeWon : homeWon;
+      result = t1Won ? 't1' : 't2';
+    }
+
+    // Append-only: never overwrite an already-recorded result
+    if (state.gActuals[match.key] === undefined) {
+      state.gActuals[match.key] = result;
+      newGroupResults[match.key] = result;
     }
   }
+
   writeData(state);
 
   return { group: newGroupResults, knockout: newKnockoutResults };
