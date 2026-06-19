@@ -202,9 +202,15 @@ app.listen(PORT, () => {
   startScheduler();
 });
 
-// ── Core refresh logic — shared by manual button + scheduler ──────────
+// ── Core refresh logic — two-step approach ────────────────────────────
+// Step 1: Search for results, get plain-text summary (cheap, no JSON needed)
+// Step 2: Convert summary to JSON (no search tool, fast and predictable)
+// This eliminates truncation risk entirely — JSON output step has no tool
+// overhead eating into its token budget.
 async function performRefresh() {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+
+  // ── Step 1: Search for match results ──────────────────────────────────
+  const searchResp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -213,63 +219,94 @@ async function performRefresh() {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4000,
+      max_tokens: 800,
       tools: [{ type: 'web_search_20250305', name: 'web_search' }],
       messages: [{
         role: 'user',
-        content: `Search for 2026 FIFA World Cup match results. I need ONLY matches that have FULLY FINISHED (full-time/final whistle blown, including any added stoppage time, extra time, or penalty shootout if applicable).
-
-CRITICAL: Do NOT include matches that are currently in progress — not at half-time, not in the second half, not in extra time, not "live". A match leading 1-0 at half-time is NOT a result; only report it if the match has reached full-time and the final whistle has blown. If a source shows a live or in-play score, exclude that match entirely from your answer. When uncertain whether a match has finished, exclude it — it is far better to omit a match than to report an in-progress score as final.
-
-YOUR ENTIRE RESPONSE MUST BE A SINGLE JSON OBJECT AND NOTHING ELSE. Do not write any summary, explanation, list, or commentary before or after the JSON. Do not describe the matches in prose. Do not use markdown code fences. The very first character of your response must be { and the very last character must be }.
-
-JSON structure — two keys: "group" and "knockout".
-
-"group" keys: "A-0" to "L-5". Match index per group: 0=[t1 vs t2], 1=[t3 vs t4], 2=[t1 vs t3], 3=[t2 vs t4], 4=[t1 vs t4], 5=[t2 vs t3].
-Teams: A=[Mexico,SouthAfrica,SouthKorea,Czechia] B=[Canada,Bosnia,Switzerland,Qatar] C=[Brazil,Morocco,Scotland,Haiti] D=[USA,Paraguay,Australia,Turkiye] E=[Germany,Curacao,IvoryCoast,Ecuador] F=[Netherlands,Japan,Sweden,Tunisia] G=[Belgium,Egypt,Iran,NewZealand] H=[Spain,CapeVerde,SaudiArabia,Uruguay] I=[France,Senegal,Norway,Iraq] J=[Argentina,Algeria,Austria,Jordan] K=[Portugal,DRCongo,Uzbekistan,Colombia] L=[England,Croatia,Ghana,Panama]
-Values: "t1"=first team wins, "t2"=second team wins, "draw"=draw. Only fully completed matches.
-
-"knockout" keys: "R32-0" to "R32-15", "R16-0" to "R16-7", "QF-0" to "QF-3", "SF-0" to "SF-1", "F-0".
-Value = exact winning team name string. Only fully completed knockout matches (factor in extra time/penalties if applicable).
-
-Remember: output ONLY the JSON object, starting with { and ending with }. No prose anywhere in your response.`
+        content: `Search for 2026 FIFA World Cup match results. List ONLY matches that have fully finished (final whistle blown, full-time confirmed). Do NOT include any match that is live, in-progress, or at half-time. For each finished match write one line: "GroupLetter-MatchIndex: Team1 score-score Team2 [FT]". If uncertain whether a match finished, omit it. Keep your response brief — just the finished match lines, nothing else.`
       }]
     })
   });
 
-  const data = await response.json();
+  const searchData = await searchResp.json();
+  if (searchData.error) {
+    throw new Error('Search step error: ' + (searchData.error.message || JSON.stringify(searchData.error)));
+  }
 
-  if (data.error) {
-    throw new Error('Anthropic API error: ' + (data.error.message || JSON.stringify(data.error)));
+  let summary = '';
+  for (const c of (searchData.content || [])) {
+    if (c.type === 'text') summary += c.text;
+  }
+
+  if (!summary.trim()) {
+    throw new Error('Empty response from search step');
+  }
+
+  // ── Step 2: Convert summary to JSON (no search tool) ──────────────────
+  const jsonResp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 500,
+      messages: [{
+        role: 'user',
+        content: `Convert these World Cup results into a JSON object. Output ONLY the JSON — no explanation, no markdown, no code fences. Start with { and end with }.
+
+Match key format:
+- Group matches: "A-0" to "L-5"
+  Match index per group: 0=[t1 vs t2], 1=[t3 vs t4], 2=[t1 vs t3], 3=[t2 vs t4], 4=[t1 vs t4], 5=[t2 vs t3]
+  Teams per group:
+  A=[Mexico,SouthAfrica,SouthKorea,Czechia] B=[Canada,Bosnia,Switzerland,Qatar]
+  C=[Brazil,Morocco,Scotland,Haiti] D=[USA,Paraguay,Australia,Turkiye]
+  E=[Germany,Curacao,IvoryCoast,Ecuador] F=[Netherlands,Japan,Sweden,Tunisia]
+  G=[Belgium,Egypt,Iran,NewZealand] H=[Spain,CapeVerde,SaudiArabia,Uruguay]
+  I=[France,Senegal,Norway,Iraq] J=[Argentina,Algeria,Austria,Jordan]
+  K=[Portugal,DRCongo,Uzbekistan,Colombia] L=[England,Croatia,Ghana,Panama]
+  Values: "t1"=first team won, "t2"=second team won, "draw"=draw
+
+- Knockout matches: "R32-0" to "R32-15", "R16-0" to "R16-7", "QF-0" to "QF-3", "SF-0" to "SF-1", "F-0"
+  Value = exact winning team name string
+
+JSON structure: {"group":{"A-0":"t1",...},"knockout":{}}
+
+Results to convert:
+${summary}`
+      }]
+    })
+  });
+
+  const jsonData = await jsonResp.json();
+  if (jsonData.error) {
+    throw new Error('JSON step error: ' + (jsonData.error.message || JSON.stringify(jsonData.error)));
   }
 
   let raw = '';
-  for (const c of (data.content || [])) {
+  for (const c of (jsonData.content || [])) {
     if (c.type === 'text') raw += c.text;
   }
 
-  if (!raw || !raw.trim()) {
-    throw new Error('Empty response from search');
+  if (!raw.trim()) {
+    throw new Error('Empty response from JSON conversion step');
   }
 
-  let jsonStr = raw.replace(/```json|```/g, '').trim();
-  const firstBrace = jsonStr.indexOf('{');
-  const lastBrace = jsonStr.lastIndexOf('}');
+  // Extract JSON object even if there's any stray surrounding text
+  const firstBrace = raw.indexOf('{');
+  const lastBrace = raw.lastIndexOf('}');
   if (firstBrace === -1 || lastBrace === -1) {
-    throw new Error('No JSON found in response: ' + raw.slice(0, 300));
+    throw new Error('No JSON object found in conversion response: ' + raw.slice(0, 200));
   }
-  jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+  const parsed = JSON.parse(raw.slice(firstBrace, lastBrace + 1));
 
-  const parsed = JSON.parse(jsonStr);
-
+  // ── Append-only merge: never overwrite an already-recorded result ──────
   const state = readData();
-
-  // Append-only merge: never overwrite an already-recorded actual result.
-  // Once a match result is stored, only a manual admin correction (via the
-  // app's admin mode) can change it — automated refreshes only fill in
-  // matches that don't have a recorded result yet. This prevents an
-  // in-progress or misread score from silently flipping a correct result.
   const newGroupResults = {};
+  const newKnockoutResults = {};
+
   if (parsed.group) {
     for (const [k, v] of Object.entries(parsed.group)) {
       if (state.gActuals[k] === undefined) {
@@ -278,7 +315,6 @@ Remember: output ONLY the JSON object, starting with { and ending with }. No pro
       }
     }
   }
-  const newKnockoutResults = {};
   if (parsed.knockout) {
     for (const [k, v] of Object.entries(parsed.knockout)) {
       if (state.kActuals[k] === undefined) {
@@ -287,8 +323,8 @@ Remember: output ONLY the JSON object, starting with { and ending with }. No pro
       }
     }
   }
-  writeData(state);
 
+  writeData(state);
   return { group: newGroupResults, knockout: newKnockoutResults };
 }
 
@@ -304,35 +340,52 @@ app.post('/api/refresh', requireKey, async (req, res) => {
 });
 
 // ── Scheduled auto-refresh based on match kickoff times ────────────────
-// Triggers a refresh 2.5h and 3.5h after each scheduled kickoff
-// (covers normal match length + stoppage time, plus a late-results safety net)
+// ONE check per match, 3h after kickoff (covers 90min + stoppage + buffer).
+// Only fires on days that actually have matches — zero wasted calls on quiet days.
 function buildRefreshTimestamps() {
   const allKickoffs = [
     ...Object.values(KICKOFFS),
     ...Object.values(K_KICKOFFS)
   ];
-  const triggers = new Set();
-  allKickoffs.forEach(ko => {
-    const t = new Date(ko).getTime();
-    triggers.add(t + 2.5 * 60 * 60 * 1000); // 2.5h after kickoff
-    triggers.add(t + 3.5 * 60 * 60 * 1000); // 3.5h after kickoff (safety net)
-  });
-  return [...triggers].sort((a, b) => a - b);
+  // One trigger per unique kickoff time, 3h after the match starts.
+  // Using a Set of kickoff times first removes duplicates (e.g. simultaneous
+  // final-matchday games share a kickoff slot — only one API call needed).
+  const uniqueKickoffs = [...new Set(allKickoffs)];
+  const triggers = uniqueKickoffs.map(ko => new Date(ko).getTime() + 3 * 60 * 60 * 1000);
+  return triggers.sort((a, b) => a - b);
 }
 
+// Days (UTC date strings) that have at least one match — scheduler only
+// wakes up the check loop on these days to avoid unnecessary polling.
+function buildMatchDays() {
+  const allKickoffs = [
+    ...Object.values(KICKOFFS),
+    ...Object.values(K_KICKOFFS)
+  ];
+  const days = new Set(allKickoffs.map(ko => ko.slice(0, 10))); // "YYYY-MM-DD"
+  return days;
+}
+
+const MATCH_DAYS = buildMatchDays();
 let firedTriggers = new Set();
 
 function startScheduler() {
   const triggers = buildRefreshTimestamps();
-  console.log(`Scheduler armed with ${triggers.length} refresh checkpoints`);
+  console.log(`Scheduler armed with ${triggers.length} checkpoints across ${MATCH_DAYS.size} match days`);
 
-  // Check every 5 minutes whether any trigger time has just passed
+  // Check every 5 minutes, but only do the full trigger scan on match days
   setInterval(async () => {
     const now = Date.now();
+    const todayUTC = new Date().toISOString().slice(0, 10);
+
+    // Skip processing entirely on non-match days — saves CPU and avoids accidental calls
+    if (!MATCH_DAYS.has(todayUTC)) return;
+
     for (const t of triggers) {
+      // Fire if we're within the 6-minute window after the trigger time, and haven't fired it yet
       if (now >= t && now < t + 6 * 60 * 1000 && !firedTriggers.has(t)) {
         firedTriggers.add(t);
-        console.log(`Scheduled refresh firing for checkpoint ${new Date(t).toISOString()}`);
+        console.log(`Scheduled refresh firing (checkpoint ${new Date(t).toISOString()})`);
         try {
           await performRefresh();
           console.log('Scheduled refresh succeeded');
@@ -341,5 +394,5 @@ function startScheduler() {
         }
       }
     }
-  }, 5 * 60 * 1000); // check every 5 minutes
+  }, 5 * 60 * 1000); // poll every 5 minutes
 }
