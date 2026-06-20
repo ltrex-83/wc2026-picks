@@ -241,6 +241,7 @@
 <div class="admin-bar" id="admin-bar">
   <span>✏️ Admin edit mode — picks can be overwritten</span>
   <span class="atimer" id="admin-timer">60s remaining</span>
+  <button class="aoff" onclick="resetActuals()" style="background:rgba(255,100,50,.3);margin-right:4px">🗑 Reset results</button>
   <button class="aoff" onclick="exitAdmin()">Exit edit mode</button>
 </div>
 
@@ -893,6 +894,31 @@ function exitAdmin(){
   document.body.classList.remove('edit-mode');
   renderActive();
   setSyncMsg('Edit mode closed');
+}
+
+async function resetActuals(){
+  const confirmed=confirm('Reset ALL match results back to Matchday 1 defaults?\n\nThis removes any incorrectly recorded results. Your picks (Luis & Melissa) are NOT affected.\n\nAfter resetting, the app will immediately re-fetch current results.');
+  if(!confirmed) return;
+  setSyncMsg('Resetting results…');
+  try{
+    const r=await fetch(RENDER_URL+'/api/reset-actuals',{
+      method:'POST',headers:apiHeaders(),body:JSON.stringify({})
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    setSyncMsg('Results reset ✓ — re-fetching now…');
+    // Immediately pull fresh state + trigger a live refresh
+    await cloudLoad();
+    const r2=await fetch(RENDER_URL+'/api/refresh',{method:'POST',headers:apiHeaders()});
+    const d=await r2.json();
+    if(d.group) Object.assign(gActuals,d.group);
+    if(d.knockout) Object.assign(kActuals,d.knockout);
+    localSave();
+    updateBadges();
+    renderActive();
+    setSyncMsg('Results reset & refreshed ✓ '+new Date().toLocaleTimeString());
+  }catch(e){
+    setSyncMsg('Reset failed — check connection');
+  }
 }
 
 // ═══════════════════════════════════════════════════════
