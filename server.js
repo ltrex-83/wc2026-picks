@@ -209,6 +209,9 @@ app.listen(PORT, () => {
 // overhead eating into its token budget.
 async function performRefresh() {
 
+  const now = new Date();
+  const todayStr = now.toUTCString(); // e.g. "Thu, 19 Jun 2026 05:00:00 GMT"
+
   // ── Step 1: Search for match results ──────────────────────────────────
   const searchResp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -223,7 +226,22 @@ async function performRefresh() {
       tools: [{ type: 'web_search_20250305', name: 'web_search' }],
       messages: [{
         role: 'user',
-        content: `Search for 2026 FIFA World Cup match results. List ONLY matches that have fully finished (final whistle blown, full-time confirmed). Do NOT include any match that is live, in-progress, or at half-time. For each finished match write one line: "GroupLetter-MatchIndex: Team1 score-score Team2 [FT]". If uncertain whether a match finished, omit it. Keep your response brief — just the finished match lines, nothing else.`
+        content: `The current date and time is ${todayStr}.
+
+Search for 2026 FIFA World Cup match results. List ONLY matches that meet ALL of these criteria:
+1. The match has FULLY FINISHED — final whistle blown, result confirmed as full-time (FT)
+2. The match kickoff time was BEFORE the current date/time above
+3. You found an ACTUAL SCORE (e.g. "2-1", "0-0") — not a prediction, preview, or fixture listing
+
+Do NOT include:
+- Matches that are scheduled but haven't kicked off yet
+- Matches that are live, in-progress, or at half-time
+- Predicted scores or match previews
+- Any match whose kickoff is in the future relative to the current time above
+
+For each qualifying finished match write one line: "GroupLetter-MatchIndex: Team1 score-score Team2 [FT]"
+If you cannot confirm a match has finished with an actual score, omit it entirely.
+Keep your response brief — only the confirmed finished match lines, nothing else.`
       }]
     })
   });
@@ -309,6 +327,12 @@ ${summary}`
 
   if (parsed.group) {
     for (const [k, v] of Object.entries(parsed.group)) {
+      // Never record a result for a match that hasn't kicked off yet
+      const kickoff = KICKOFFS[k];
+      if (kickoff && Date.now() < new Date(kickoff).getTime() + 90 * 60 * 1000) {
+        console.warn(`Skipping ${k} — kickoff hasn't passed minimum match time yet`);
+        continue;
+      }
       if (state.gActuals[k] === undefined) {
         state.gActuals[k] = v;
         newGroupResults[k] = v;
@@ -317,6 +341,12 @@ ${summary}`
   }
   if (parsed.knockout) {
     for (const [k, v] of Object.entries(parsed.knockout)) {
+      const rnd = k.split('-')[0];
+      const kickoff = K_KICKOFFS[rnd];
+      if (kickoff && Date.now() < new Date(kickoff).getTime() + 90 * 60 * 1000) {
+        console.warn(`Skipping ${k} — knockout round hasn't reached minimum match time yet`);
+        continue;
+      }
       if (state.kActuals[k] === undefined) {
         state.kActuals[k] = v;
         newKnockoutResults[k] = v;
@@ -328,7 +358,51 @@ ${summary}`
   return { group: newGroupResults, knockout: newKnockoutResults };
 }
 
-// ── Manual refresh endpoint (button in the UI) ─────────────────────────
+// ── View current actuals (so you can spot bad entries) ─────────────────
+app.get('/api/actuals', requireKey, (req, res) => {
+  const data = readData();
+  res.json({
+    gActuals: data.gActuals,
+    kActuals: data.kActuals,
+    totalGroup: Object.keys(data.gActuals).length,
+    totalKnockout: Object.keys(data.kActuals).length
+  });
+});
+
+// ── Delete a single bad actual result ──────────────────────────────────
+// Body: { key: "A-0", type: "group" } or { key: "R32-0", type: "knockout" }
+app.post('/api/actuals/delete', requireKey, (req, res) => {
+  const { key, type } = req.body;
+  if (!key || !type) return res.status(400).json({ error: 'Missing key or type' });
+  const data = readData();
+  if (type === 'group') {
+    if (data.gActuals[key] === undefined) return res.status(404).json({ error: 'Key not found' });
+    const old = data.gActuals[key];
+    delete data.gActuals[key];
+    writeData(data);
+    res.json({ success: true, deleted: key, was: old });
+  } else if (type === 'knockout') {
+    if (data.kActuals[key] === undefined) return res.status(404).json({ error: 'Key not found' });
+    const old = data.kActuals[key];
+    delete data.kActuals[key];
+    writeData(data);
+    res.json({ success: true, deleted: key, was: old });
+  } else {
+    res.status(400).json({ error: 'type must be "group" or "knockout"' });
+  }
+});
+
+// ── Reset ALL actuals back to seeded defaults ───────────────────────────
+// Use this to wipe bad entries and start fresh from known correct results.
+app.post('/api/reset-actuals', requireKey, (req, res) => {
+  const data = readData();
+  data.gActuals = Object.assign({}, SEED_ACTUALS);
+  data.kActuals = {};
+  writeData(data);
+  res.json({ success: true, message: 'Actuals reset to seeded defaults', gActuals: data.gActuals });
+});
+
+
 app.post('/api/refresh', requireKey, async (req, res) => {
   try {
     const result = await performRefresh();
@@ -378,12 +452,16 @@ function startScheduler() {
     const now = Date.now();
     const todayUTC = new Date().toISOString().slice(0, 10);
 
-    // Skip processing entirely on non-match days — saves CPU and avoids accidental calls
+    // Skip processing entirely on non-match days
     if (!MATCH_DAYS.has(todayUTC)) return;
 
     for (const t of triggers) {
-      // Fire if we're within the 6-minute window after the trigger time, and haven't fired it yet
-      if (now >= t && now < t + 6 * 60 * 1000 && !firedTriggers.has(t)) {
+      // Only fire if:
+      // 1. The trigger time has passed (match is 3h old)
+      // 2. We're within the 6-minute fire window
+      // 3. We haven't already fired this trigger
+      // 4. The trigger is in the past (guards against clock skew or bad data)
+      if (now >= t && now < t + 6 * 60 * 1000 && !firedTriggers.has(t) && t < now) {
         firedTriggers.add(t);
         console.log(`Scheduled refresh firing (checkpoint ${new Date(t).toISOString()})`);
         try {
