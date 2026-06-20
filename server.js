@@ -327,6 +327,11 @@ ${summary}`
 
   if (parsed.group) {
     for (const [k, v] of Object.entries(parsed.group)) {
+      // Skip empty strings or invalid values
+      if (!v || !['t1','t2','draw'].includes(v)) {
+        console.warn(`Skipping ${k} — invalid result value: "${v}"`);
+        continue;
+      }
       // Never record a result for a match that hasn't kicked off yet
       const kickoff = KICKOFFS[k];
       if (kickoff && Date.now() < new Date(kickoff).getTime() + 90 * 60 * 1000) {
@@ -341,6 +346,11 @@ ${summary}`
   }
   if (parsed.knockout) {
     for (const [k, v] of Object.entries(parsed.knockout)) {
+      // Skip empty strings or invalid values
+      if (!v || typeof v !== 'string' || v.trim() === '') {
+        console.warn(`Skipping knockout ${k} — invalid result value: "${v}"`);
+        continue;
+      }
       const rnd = k.split('-')[0];
       const kickoff = K_KICKOFFS[rnd];
       if (kickoff && Date.now() < new Date(kickoff).getTime() + 90 * 60 * 1000) {
@@ -392,7 +402,29 @@ app.post('/api/actuals/delete', requireKey, (req, res) => {
   }
 });
 
-// ── Reset ALL actuals back to seeded defaults ───────────────────────────
+// ── Set a specific actual result (admin results editor) ────────────────
+// Body: { key: "A-0", result: "t1"|"t2"|"draw", type: "group"|"knockout" }
+app.post('/api/actuals/set', requireKey, (req, res) => {
+  const { key, result, type } = req.body;
+  if (!key || !result || !type) return res.status(400).json({ error: 'Missing fields' });
+  if (!['t1', 't2', 'draw'].includes(result)) return res.status(400).json({ error: 'Invalid result' });
+  const data = readData();
+  if (type === 'group') {
+    const old = data.gActuals[key];
+    data.gActuals[key] = result;
+    writeData(data);
+    res.json({ success: true, key, result, previous: old });
+  } else if (type === 'knockout') {
+    const old = data.kActuals[key];
+    data.kActuals[key] = result;
+    writeData(data);
+    res.json({ success: true, key, result, previous: old });
+  } else {
+    res.status(400).json({ error: 'type must be "group" or "knockout"' });
+  }
+});
+
+
 // Use this to wipe bad entries and start fresh from known correct results.
 app.post('/api/reset-actuals', requireKey, (req, res) => {
   const data = readData();
