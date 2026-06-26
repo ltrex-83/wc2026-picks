@@ -113,11 +113,7 @@
   .kresult.kok { color: var(--lime-dark); background: var(--lime-light); }
   .kresult.kwrong { color: var(--red-dark); background: var(--red-light); }
 
-  .rbtn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; background: var(--card); color: var(--muted); font-size: 12px; font-family: var(--font); margin-bottom: 14px; transition: all .15s; }
-  .rbtn:hover { border-color: var(--green); color: var(--green); }
-  .spin { display: inline-block; animation: sp 1s linear infinite; }
-  @keyframes sp { to { transform: rotate(360deg); } }
-  .smsg { font-size: 10px; color: var(--subtle); }
+
 
   .sc-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
   .sc-card { border-radius: var(--radius); padding: 14px; text-align: center; }
@@ -708,25 +704,120 @@ function renderGroups(){
 function buildResultsEditor(){
   if(!adminMode) return '';
   const groups = Object.keys(GROUPS);
-  let h = '<div class="results-editor"><h3>✏️ Set actual match results</h3>';
+  let h = `<div class="results-editor">
+    <h3>✏️ Enter match results</h3>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:10px">Click the winning team to record a result. Draw where applicable. Use ✕ Clear to remove an incorrect entry.</p>
+    <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Group Stage</div>`;
+
   groups.forEach(g => {
     const ts = GROUPS[g].t;
+    h += `<div style="font-size:10px;font-weight:600;color:#fff;background:var(--green);display:inline-block;padding:1px 6px;border-radius:3px;margin:6px 0 4px">Group ${g}</div>`;
     GM.forEach(([a,b], mi) => {
       const k = g+'-'+mi;
       const t1 = ts[a], t2 = ts[b];
       const cur = gActuals[k];
+      // Only show matches that have kicked off (past kickoff time)
+      const ko = KICKOFFS[k];
+      const kicked = !ko || Date.now() >= new Date(ko).getTime();
+      if(!kicked) return; // hide future matches
       h += `<div class="re-row">
         <span class="re-label">${t1} v ${t2}</span>
-        <button class="re-btn ${cur==='t1'?'re-active':''}" onclick="setActual('${k}','t1','${t1}')">${t1}</button>
-        <button class="re-btn ${cur==='draw'?'re-active':''}" onclick="setActual('${k}','draw','Draw')">Draw</button>
-        <button class="re-btn ${cur==='t2'?'re-active':''}" onclick="setActual('${k}','t2','${t2}')">${t2}</button>
-        <button class="re-btn" onclick="clearActual('${k}')" style="color:var(--red-dark);border-color:var(--red-dark)">✕ Clear</button>
-        ${cur?`<span style="font-size:9px;color:var(--lime-dark)">✓ ${cur==='t1'?t1:cur==='t2'?t2:'Draw'}</span>`:'<span style="font-size:9px;color:var(--subtle)">Not set</span>'}
+        <button class="re-btn ${cur==='t1'?'re-active':''}" onclick="setActual('${k}','t1','${t1}','group')">${t1}</button>
+        <button class="re-btn ${cur==='draw'?'re-active':''}" onclick="setActual('${k}','draw','Draw','group')">Draw</button>
+        <button class="re-btn ${cur==='t2'?'re-active':''}" onclick="setActual('${k}','t2','${t2}','group')">${t2}</button>
+        <button class="re-btn" onclick="clearActual('${k}','group')" style="color:var(--red-dark);border-color:var(--red-dark)">✕</button>
+        ${cur?`<span style="font-size:9px;color:var(--lime-dark)">✓ ${cur==='t1'?t1:cur==='t2'?t2:'Draw'}</span>`:'<span style="font-size:9px;color:var(--subtle)">—</span>'}
       </div>`;
     });
   });
+
+  // Knockout section
+  const krounds = [
+    {key:'R32',label:'Round of 32',n:16},
+    {key:'R16',label:'Round of 16',n:8},
+    {key:'QF', label:'Quarter-finals',n:4},
+    {key:'SF', label:'Semi-finals',n:2},
+    {key:'F',  label:'Final',n:1}
+  ];
+  krounds.forEach(({key,label,n}) => {
+    const rndKo = K_KICKOFFS[key];
+    const rndKicked = !rndKo || Date.now() >= new Date(rndKo).getTime();
+    if(!rndKicked) return; // hide future rounds
+    h += `<div style="font-size:11px;font-weight:600;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.04em">${label}</div>`;
+    for(let i=0;i<n;i++){
+      const k=`${key}-${i}`;
+      const [t1,t2]=getKTeams(key,i);
+      const cur=kActuals[k];
+      const tb1=isTbd(t1),tb2=isTbd(t2);
+      if(tb1||tb2) continue; // skip TBD matches
+      h += `<div class="re-row">
+        <span class="re-label">${t1} v ${t2}</span>
+        <button class="re-btn ${cur===t1?'re-active':''}" onclick="setKActual('${k}','${t1.replace(/'/g,"\'")}','group')">${t1}</button>
+        <button class="re-btn ${cur===t2?'re-active':''}" onclick="setKActual('${k}','${t2.replace(/'/g,"\'")}','group')">${t2}</button>
+        <button class="re-btn" onclick="clearActual('${k}','knockout')" style="color:var(--red-dark);border-color:var(--red-dark)">✕</button>
+        ${cur?`<span style="font-size:9px;color:var(--lime-dark)">✓ ${cur}</span>`:'<span style="font-size:9px;color:var(--subtle)">—</span>'}
+      </div>`;
+    }
+  });
+
   h += '<div class="re-status" id="re-status"></div></div>';
   return h;
+}
+
+async function setActual(key, result, label, type){
+  try{
+    const r = await fetch(RENDER_URL+'/api/actuals/set',{
+      method:'POST', headers:apiHeaders(),
+      body:JSON.stringify({key, result, type})
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    if(type==='group') gActuals[key]=result;
+    else kActuals[key]=result;
+    localSave(); updateBadges();
+    const el=document.getElementById('re-status');
+    if(el) el.textContent=`✓ ${key} → ${label}`;
+    renderGroups();
+  } catch(e){
+    const el=document.getElementById('re-status');
+    if(el) el.textContent='Failed: '+e.message;
+  }
+}
+
+async function setKActual(key, team, type){
+  try{
+    const r = await fetch(RENDER_URL+'/api/actuals/set',{
+      method:'POST', headers:apiHeaders(),
+      body:JSON.stringify({key, result:team, type:'knockout'})
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    kActuals[key]=team;
+    localSave(); updateBadges();
+    const el=document.getElementById('re-status');
+    if(el) el.textContent=`✓ ${key} → ${team}`;
+    renderKnockout();
+  } catch(e){
+    const el=document.getElementById('re-status');
+    if(el) el.textContent='Failed: '+e.message;
+  }
+}
+
+async function clearActual(key, type){
+  try{
+    const r = await fetch(RENDER_URL+'/api/actuals/delete',{
+      method:'POST', headers:apiHeaders(),
+      body:JSON.stringify({key, type})
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    if(type==='group') delete gActuals[key];
+    else delete kActuals[key];
+    localSave(); updateBadges();
+    const el=document.getElementById('re-status');
+    if(el) el.textContent=`✓ ${key} cleared`;
+    renderGroups();
+  } catch(e){
+    const el=document.getElementById('re-status');
+    if(el) el.textContent='Failed: '+e.message;
+  }
 }
 
 async function setActual(key, result, label){
@@ -786,10 +877,7 @@ function renderKnockout(){
     Bracket auto-fills as group results come in. Click to pick a winner — <strong>locked once chosen</strong>.
     Scoring: R32 &amp; R16 = 1pt · QF = 3pts · SF = 4pts · Final = 6pts
   </div>
-  <button class="rbtn" onclick="refreshAll(this)">
-    <span id="ricon">↻</span> Refresh live results
-    <span class="smsg" id="smsg">${fetchStatus||'Last updated: seeded data'}</span>
-  </button>`;
+`;
 
   const rounds=[
     {key:'R32',label:'Round of 32',n:16},
@@ -847,35 +935,7 @@ function renderKnockout(){
   wrap.innerHTML=h;
 }
 
-// ═══════════════════════════════════════════════════════
-// LIVE REFRESH via Claude API
-// ═══════════════════════════════════════════════════════
-async function refreshAll(btn){
-  const icon=document.getElementById('ricon');
-  const smsg=document.getElementById('smsg');
-  if(icon) icon.classList.add('spin');
-  if(smsg) smsg.textContent='Fetching latest results…';
-  try{
-    const resp=await fetch(RENDER_URL+'/api/refresh',{
-      method:'POST',
-      headers:apiHeaders()
-    });
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
-    const data=await resp.json();
-    if(data.group) Object.assign(gActuals,data.group);
-    if(data.knockout) Object.assign(kActuals,data.knockout);
-    localSave();
-    fetchStatus='Updated '+new Date().toLocaleTimeString();
-    updateBadges();
-    renderActive();
-    setSyncMsg('Results refreshed ✓ '+new Date().toLocaleTimeString());
-  }catch(e){
-    fetchStatus='Update failed — try again';
-    if(smsg) smsg.textContent=fetchStatus;
-    setSyncMsg('Refresh failed — try again');
-  }
-  if(icon) icon.classList.remove('spin');
-}
+
 
 // ═══════════════════════════════════════════════════════
 // SCOREBOARD
