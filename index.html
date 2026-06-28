@@ -292,7 +292,8 @@ const R32_DESC=[
   ['1D','3rd'],['1G','3rd'],['2K','2L'],['1H','2J'],
   ['1B','3rd'],['1J','2H'],['1K','3rd'],['2D','2G']
 ];
-const R16_PAIRS=[[0,3],[1,2],[4,5],[6,7],[8,11],[9,10],[12,15],[13,14]];
+const // R16 pairs — official FIFA bracket tree
+const R16_PAIRS=[[0,3],[1,2],[4,5],[6,7],[8,9],[10,11],[12,13],[14,15]];
 const QF_PAIRS=[[0,1],[2,3],[4,5],[6,7]];
 const SF_PAIRS=[[0,1],[2,3]];
 const F_PAIRS=[[0,1]];
@@ -535,9 +536,28 @@ function resolveDesc(d,W,R){
   return d;
 }
 
+// Confirmed R32 matchups — hardcoded from official FIFA bracket
+const R32_TEAMS = [
+  ['South Africa','Canada'],           // R32-0  M73
+  ['Germany','Paraguay'],              // R32-1  M74
+  ['Netherlands','Morocco'],           // R32-2  M75
+  ['Brazil','Japan'],                  // R32-3  M76
+  ['France','Sweden'],                 // R32-4  M77
+  ['Ivory Coast','Norway'],            // R32-5  M78
+  ['Mexico','Ecuador'],                // R32-6  M79
+  ['England','DR Congo'],              // R32-7  M80
+  ['USA','Bosnia-Herzegovina'],        // R32-8  M81
+  ['Belgium','Senegal'],               // R32-9  M82
+  ['Portugal','Croatia'],              // R32-10 M83
+  ['Spain','Algeria'],                 // R32-11 M84 (was Cape Verde vs Algeria but Spain vs Algeria per CBS)
+  ['Switzerland','Austria'],           // R32-12 M85
+  ['Argentina','Cape Verde'],          // R32-13 M86
+  ['Colombia','Ghana'],                // R32-14 M87
+  ['Australia','Egypt'],               // R32-15 M88
+];
+
 function getKTeams(rnd,i){
-  const {W,R}=getQualified();
-  if(rnd==='R32') return R32_DESC[i].map(d=>resolveDesc(d,W,R));
+  if(rnd==='R32') return R32_TEAMS[i] || ['TBD','TBD'];
   const prevRnd={R16:'R32',QF:'R16',SF:'QF',F:'SF'}[rnd];
   const pairsMap={R16:R16_PAIRS,QF:QF_PAIRS,SF:SF_PAIRS,F:F_PAIRS};
   const [ia,ib]=pairsMap[rnd][i];
