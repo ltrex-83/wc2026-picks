@@ -530,24 +530,24 @@ function resolveDesc(d,W,R){
   return d;
 }
 
-// Confirmed R32 matchups — hardcoded from official FIFA bracket
+// Confirmed R32 matchups — official FIFA bracket, all 16 matches verified
 const R32_TEAMS = [
-  ['South Africa','Canada'],           // R32-0  M73
-  ['Germany','Paraguay'],              // R32-1  M74
-  ['Netherlands','Morocco'],           // R32-2  M75
-  ['Brazil','Japan'],                  // R32-3  M76
-  ['France','Sweden'],                 // R32-4  M77
-  ['Ivory Coast','Norway'],            // R32-5  M78
-  ['Mexico','Ecuador'],                // R32-6  M79
-  ['England','DR Congo'],              // R32-7  M80
-  ['USA','Bosnia-Herzegovina'],        // R32-8  M81
-  ['Belgium','Senegal'],               // R32-9  M82
-  ['Portugal','Croatia'],              // R32-10 M83
-  ['Spain','Algeria'],                 // R32-11 M84 (was Cape Verde vs Algeria but Spain vs Algeria per CBS)
-  ['Switzerland','Austria'],           // R32-12 M85
-  ['Argentina','Cape Verde'],          // R32-13 M86
-  ['Colombia','Ghana'],                // R32-14 M87
-  ['Australia','Egypt'],               // R32-15 M88
+  ['South Africa','Canada'],        // R32-0  M73 Jun 28
+  ['Germany','Paraguay'],           // R32-1  M74 Jun 29
+  ['Netherlands','Morocco'],        // R32-2  M75 Jun 29 (was listed as M75 but plays Jun 29/30)
+  ['Brazil','Japan'],               // R32-3  M76 Jun 29
+  ['France','Sweden'],              // R32-4  M77 Jun 30
+  ['Ivory Coast','Norway'],         // R32-5  M78 Jun 30
+  ['Mexico','Ecuador'],             // R32-6  M79 Jul 1
+  ['England','DR Congo'],           // R32-7  M80 Jul 1
+  ['USA','Bosnia-Herzegovina'],     // R32-8  M81 Jul 1
+  ['Belgium','Senegal'],            // R32-9  M82 Jul 1 (Belgium G winner vs Senegal 3rd I)
+  ['Portugal','Croatia'],           // R32-10 M83 Jul 2
+  ['Spain','Austria'],              // R32-11 M84 Jul 2 (Spain H winner vs Austria J runner-up)
+  ['Switzerland','Algeria'],        // R32-12 M85 Jul 2 (Switzerland B winner vs Algeria J 3rd)
+  ['Argentina','Cape Verde'],       // R32-13 M86 Jul 3
+  ['Colombia','Ghana'],             // R32-14 M87 Jul 3
+  ['Australia','Egypt'],            // R32-15 M88 Jul 3
 ];
 
 function getKTeams(rnd,i){
