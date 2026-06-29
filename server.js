@@ -196,18 +196,22 @@ app.post('/api/actuals/delete', requireKey, (req, res) => {
 app.post('/api/actuals/set', requireKey, (req, res) => {
   const { key, result, type } = req.body;
   if (!key || !result || !type) return res.status(400).json({ error: 'Missing fields' });
-  if (!['t1', 't2', 'draw'].includes(result)) return res.status(400).json({ error: 'Invalid result' });
+
   const data = readData();
   if (type === 'group') {
+    // Group results must be t1, t2, or draw
+    if (!['t1', 't2', 'draw'].includes(result)) return res.status(400).json({ error: 'Invalid group result — must be t1, t2, or draw' });
     const old = data.gActuals[key];
     data.gActuals[key] = result;
     writeData(data);
     res.json({ success: true, key, result, previous: old });
   } else if (type === 'knockout') {
+    // Knockout results are team name strings — just validate it's a non-empty string
+    if (typeof result !== 'string' || result.trim() === '') return res.status(400).json({ error: 'Invalid knockout result — must be a team name string' });
     const old = data.kActuals[key];
-    data.kActuals[key] = result;
+    data.kActuals[key] = result.trim();
     writeData(data);
-    res.json({ success: true, key, result, previous: old });
+    res.json({ success: true, key, result: result.trim(), previous: old });
   } else {
     res.status(400).json({ error: 'type must be "group" or "knockout"' });
   }
